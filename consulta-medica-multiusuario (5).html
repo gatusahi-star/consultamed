@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedConsulta · Sistema de Gestión de Consulta Médica (Multiusuario)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16302B; --ink2:#254740; --paper:#F5F4EF; --card:#FFFFFF;
+  --accent:#0E7C66; --accent-soft:#E3F1ED; --amber:#B7791F; --amber-soft:#FBF3E4;
+  --red:#B3423A; --red-soft:#FBEAE8; --blue:#2A5B8C; --blue-soft:#E8F0F8;
+  --line:#E2E0D8; --muted:#6E7A76; --radius:10px;
+  --font-display:'Sora',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ===== Layout ===== */
+#app{display:flex;min-height:100vh}
+.sidebar{width:225px;background:var(--ink);color:#DCE6E2;padding:20px 0;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.logo{padding:0 20px 18px;border-bottom:1px solid rgba(255,255,255,.09);margin-bottom:12px}
+.logo h1{font-family:var(--font-display);font-size:19px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.logo h1 span{color:#7FC7B5}
+.logo p{font-size:11px;color:#8FA39D;margin-top:2px}
+.nav{flex:1;overflow-y:auto}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:#B9C9C4;padding:10px 20px;font-size:13.5px;text-align:left;border-left:3px solid transparent;transition:.15s}
+.nav button:hover{background:rgba(255,255,255,.05);color:#fff}
+.nav button.active{background:rgba(127,199,181,.12);color:#fff;border-left-color:#7FC7B5;font-weight:600}
+.nav .icon{width:18px;text-align:center;font-size:15px}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:#5E736D;padding:14px 20px 6px}
+.sidebar-footer{padding:14px 20px 0;border-top:1px solid rgba(255,255,255,.09);font-size:11px;color:#8FA39D}
+
+.main{flex:1;padding:26px 32px;max-width:1200px;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.topbar h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.4px}
+.topbar .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.search-global{position:relative}
+.search-global input{padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:8px;width:250px;background:var(--card)}
+.search-global::before{content:'🔍';position:absolute;left:10px;top:8px;font-size:13px;opacity:.5}
+.search-results{position:absolute;top:42px;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow-y:auto}
+.search-results div{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.search-results div:hover{background:var(--accent-soft)}
+
+/* ===== Components ===== */
+.grid{display:grid;gap:16px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.card h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.kpi .num{font-family:var(--font-display);font-size:28px;font-weight:700;letter-spacing:-.5px}
+.kpi .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi .delta{font-size:11.5px;margin-top:6px}
+.delta.up{color:var(--accent)} .delta.down{color:var(--red)} .delta.warn{color:var(--amber)}
+
+.btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;transition:.15s}
+.btn:hover{background:#0A6553}
+.btn.secondary{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn.danger{background:var(--red)} .btn.danger:hover{background:#93332C}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.btn.ghost{background:none;color:var(--accent);border:none;padding:4px 8px}
+
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.green{background:var(--accent-soft);color:var(--accent)}
+.badge.amber{background:var(--amber-soft);color:var(--amber)}
+.badge.red{background:var(--red-soft);color:var(--red)}
+.badge.blue{background:var(--blue-soft);color:var(--blue)}
+.badge.gray{background:#EEEDE7;color:var(--muted)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line);font-weight:600}
+td{padding:10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+tr:hover td{background:#FAFAF6}
+tr.clickable{cursor:pointer}
+
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.form-grid .full{grid-column:1/-1}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.field textarea{resize:vertical;min-height:70px}
+.field .hint{font-size:11px;color:var(--muted);margin-top:3px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(22,48,43,.45);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.modal{background:var(--card);border-radius:14px;width:100%;max-width:720px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal.wide{max-width:900px}
+.modal h3{font-family:var(--font-display);font-size:17px;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
+.tabs button{background:none;border:none;padding:9px 15px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+.alert-strip{background:var(--red-soft);border:1px solid #EDCBC7;color:var(--red);padding:9px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:14px}
+.info-strip{background:var(--blue-soft);border:1px solid #CCDCEC;color:var(--blue);padding:9px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+
+/* Ficha de paciente: banda tipo expediente clínico */
+.chart-band{background:var(--ink);color:#fff;border-radius:var(--radius);padding:20px 22px;margin-bottom:18px;display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.chart-band .avatar{width:56px;height:56px;border-radius:50%;background:#7FC7B5;color:var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:21px;font-weight:700;flex-shrink:0}
+.chart-band h2{font-family:var(--font-display);font-size:20px;letter-spacing:-.3px}
+.chart-band .meta{font-size:12.5px;color:#A9BEB8;margin-top:3px}
+.chart-band .vitals{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+.chart-band .vital .v{font-family:var(--font-display);font-size:16px;font-weight:600}
+.chart-band .vital .k{font-size:10.5px;color:#8FA39D;text-transform:uppercase;letter-spacing:.8px}
+
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:'';position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding-bottom:16px}
+.tl-item::before{content:'';position:absolute;left:-20px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid #fff}
+.tl-item .tl-date{font-size:11.5px;color:var(--muted);font-weight:600}
+.tl-item .tl-body{background:#FAFAF6;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:5px;font-size:13px}
+
+.bars{display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:10px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.bar-col .bar{width:100%;max-width:44px;background:var(--accent);border-radius:5px 5px 0 0;transition:.3s;min-height:2px}
+.bar-col .bl{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bar-col .bv{font-size:11px;font-weight:600}
+
+.empty{text-align:center;padding:36px 16px;color:var(--muted)}
+.empty .big{font-size:34px;margin-bottom:8px;opacity:.5}
+.toast{position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:slideup .25s}
+@keyframes slideup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.scale-grid{display:grid;grid-template-columns:1fr repeat(4,58px);gap:4px;align-items:center;font-size:12.5px}
+.scale-grid .sq{font-size:12.5px}
+.scale-grid label{text-align:center;font-size:11px;cursor:pointer;padding:5px 2px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.scale-grid input{display:none}
+.scale-grid input:checked+span{display:block;background:var(--accent);color:#fff;border-radius:5px;margin:-5px -2px;padding:5px 2px}
+.score-pill{font-family:var(--font-display);font-weight:700;font-size:16px}
+
+/* ===== Impresión ===== */
+
+/* ===== Pantalla de acceso ===== */
+#auth-screen{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px}
+.auth-card{background:var(--card);border-radius:16px;padding:32px;width:100%;max-width:420px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
+.auth-card h1{font-family:var(--font-display);font-size:24px;letter-spacing:-.4px;margin-bottom:2px}
+.auth-card h1 span{color:var(--accent)}
+.auth-card .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.auth-card .field{margin-bottom:12px}
+.auth-msg{font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+.auth-msg.err{display:block;background:var(--red-soft);color:var(--red)}
+.auth-msg.ok{display:block;background:var(--accent-soft);color:var(--accent)}
+#app{display:none}
+#app.autenticado{display:flex}
+.sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7FC7B5;margin-right:6px}
+.sync-dot.saving{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+#print-area{display:none}
+@media print{
+  #app,.toast,.modal-bg{display:none!important}
+  #print-area{display:block!important;font-family:Georgia,serif;color:#000}
+  .doc{max-width:680px;margin:0 auto;padding:10px}
+  .doc-head{border-bottom:2.5px solid #16302B;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-end}
+  .doc-head h1{font-size:20px;font-family:'Sora',sans-serif;color:#16302B}
+  .doc-head .cred{font-size:12px;color:#333;margin-top:3px;line-height:1.5}
+  .doc-head .rx{font-size:44px;font-family:Georgia,serif;color:#16302B}
+  .doc-title{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:14px 0;text-align:center}
+  .doc-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .doc-body{font-size:14px;line-height:1.8;margin:18px 0;min-height:200px}
+  .doc-body ol{padding-left:22px}
+  .doc-body li{margin-bottom:12px}
+  .doc-sign{margin-top:70px;text-align:center}
+  .doc-sign .line{border-top:1.5px solid #000;width:260px;margin:0 auto;padding-top:6px;font-size:13px}
+  .doc-foot{margin-top:26px;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#555;text-align:center}
+  .doc table{width:100%;border-collapse:collapse;font-size:13px}
+  .doc td,.doc th{border:1px solid #999;padding:6px 9px}
+}
+@media(max-width:960px){
+  .grid-4,.grid-3{grid-template-columns:repeat(2,1fr)}
+  .sidebar{width:64px}
+  .sidebar .logo h1,.sidebar .logo p,.nav .txt,.nav-section,.sidebar-footer{display:none}
+  .nav button{justify-content:center;padding:12px 0}
+  .main{padding:18px 14px}
+}
+@media(max-width:640px){.grid-4,.grid-3,.grid-2,.form-grid{grid-template-columns:1fr}.chart-band .vitals{margin-left:0}}
+
+/* ============================================================
+   CAPA VISUAL DINÁMICA — aurora, cristal, ondas, movimiento
+============================================================ */
+/* Fondo aurora ambiental (detrás de todo, nunca sobre texto) */
+#aurora{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.wl{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform}
+.wl1{width:46vw;height:46vw;background:radial-gradient(circle,#7FC7B5,transparent 68%);top:-12vw;left:-8vw;animation:drift1 26s ease-in-out infinite}
+.wl2{width:40vw;height:40vw;background:radial-gradient(circle,#2A5B8C,transparent 68%);bottom:-14vw;right:-6vw;animation:drift2 32s ease-in-out infinite}
+.wl3{width:34vw;height:34vw;background:radial-gradient(circle,#B7791F,transparent 70%);top:38%;left:52%;opacity:.28;animation:drift3 38s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(8vw,6vh) scale(1.15)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7vw,-5vh) scale(1.1)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-6vw,4vh) scale(1.12)}66%{transform:translate(5vw,-3vh) scale(.92)}}
+
+/* El contenido va por encima del aurora */
+#app,#auth-screen,#modal-root,#toast-root{position:relative;z-index:1}
+body{background:linear-gradient(135deg,#F5F4EF 0%,#EDF1EF 100%)}
+
+/* Cristal esmerilado en tarjetas y barras */
+.main{position:relative;z-index:1}
+.card{background:rgba(255,255,255,.72);backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1);
+  border:1px solid rgba(255,255,255,.6);box-shadow:0 4px 24px rgba(22,48,43,.06);
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s}
+.card:hover{transform:translateY(-3px);box-shadow:0 14px 40px rgba(22,48,43,.12)}
+.sidebar{background:linear-gradient(180deg,#16302B 0%,#0E241F 100%);box-shadow:4px 0 30px rgba(0,0,0,.15)}
+.chart-band{background:linear-gradient(120deg,#16302B,#1d3d36);box-shadow:0 10px 34px rgba(22,48,43,.22);position:relative;overflow:hidden}
+.chart-band::after{content:'';position:absolute;top:-50%;right:-10%;width:280px;height:280px;background:radial-gradient(circle,rgba(127,199,181,.25),transparent 65%);animation:pulseGlow 6s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.25);opacity:.9}}
+
+/* KPIs con brillo al aparecer */
+.kpi{position:relative;overflow:hidden}
+.kpi .num{background:linear-gradient(90deg,var(--ink),var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.kpi::before{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-20deg)}
+.kpi:hover::before{animation:shine .9s ease}
+@keyframes shine{to{left:130%}}
+
+/* Aparición escalonada de tarjetas al renderizar vista */
+.grid>*,.card{animation:riseIn .5s cubic-bezier(.2,.8,.2,1) both}
+.grid>*:nth-child(2){animation-delay:.06s}
+.grid>*:nth-child(3){animation-delay:.12s}
+.grid>*:nth-child(4){animation-delay:.18s}
+@keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+/* Botones con vida */
+.btn{position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(14,124,102,.25);transition:transform .18s,box-shadow .25s,background .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(14,124,102,.35)}
+.btn:active{transform:translateY(0) scale(.97)}
+.btn.secondary{box-shadow:0 2px 8px rgba(22,48,43,.06)}
+
+/* Navegación: subrayado que se desliza */
+.nav button{position:relative;transition:background .2s,color .2s,padding-left .2s}
+.nav button:hover{padding-left:24px}
+.nav button.active{background:linear-gradient(90deg,rgba(127,199,181,.18),transparent)}
+
+/* Filas de tabla con realce suave */
+tr.clickable{transition:background .2s,transform .15s}
+tbody tr.clickable:hover{transform:translateX(3px)}
+
+/* Badges con leve latido en alertas rojas */
+.badge.red{animation:softpulse 2.4s ease-in-out infinite}
+@keyframes softpulse{0%,100%{opacity:1}50%{opacity:.72}}
+
+/* Modales con entrada elástica y fondo esmerilado */
+.modal-bg{backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:fadeIn .2s}
+.modal{animation:popIn .32s cubic-bezier(.2,.9,.3,1.3);background:rgba(255,255,255,.94);backdrop-filter:blur(20px)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* Barras de reportes que crecen al aparecer */
+.bar{animation:growBar .8s cubic-bezier(.2,.8,.2,1) both;transform-origin:bottom}
+@keyframes growBar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.bar-col:hover .bar{filter:brightness(1.15);box-shadow:0 0 16px rgba(14,124,102,.4)}
+
+/* Toast con entrada e indicador de vida */
+.toast{backdrop-filter:blur(10px);background:rgba(22,48,43,.92);border:1px solid rgba(127,199,181,.3)}
+
+/* Onda al hacer clic (ripple global) */
+.ripple{position:fixed;border-radius:50%;pointer-events:none;z-index:9999;
+  background:radial-gradient(circle,rgba(14,124,102,.5),rgba(127,199,181,.15) 60%,transparent 70%);
+  transform:translate(-50%,-50%);animation:rippleOut .6s ease-out forwards}
+@keyframes rippleOut{from{width:0;height:0;opacity:.9}to{width:220px;height:220px;opacity:0}}
+
+/* Login: tarjeta de cristal sobre aurora */
+#auth-screen{background:linear-gradient(135deg,#16302B,#0E241F)}
+.auth-card{background:rgba(255,255,255,.9);backdrop-filter:blur(24px) saturate(1.2);
+  border:1px solid rgba(255,255,255,.5);box-shadow:0 30px 80px rgba(0,0,0,.45);
+  animation:popIn .5s cubic-bezier(.2,.9,.3,1.2)}
+.auth-card .btn{width:100%}
+
+/* Latido del punto de sincronización activo */
+.sync-dot{box-shadow:0 0 0 0 rgba(127,199,181,.6);animation:beat 2.5s infinite}
+@keyframes beat{0%{box-shadow:0 0 0 0 rgba(127,199,181,.5)}70%{box-shadow:0 0 0 7px rgba(127,199,181,0)}100%{box-shadow:0 0 0 0 rgba(127,199,181,0)}}
+
+
+/* ===== Firma: línea de electrocardiograma bajo el logo ===== */
+.ecg-wrap{margin-top:8px;height:26px;overflow:hidden}
+.ecg-wrap svg{width:100%;height:100%}
+.ecg-path{fill:none;stroke:#7FC7B5;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:320;stroke-dashoffset:320;animation:ecgDraw 3.2s linear infinite;
+  filter:drop-shadow(0 0 4px rgba(127,199,181,.7))}
+@keyframes ecgDraw{0%{stroke-dashoffset:320}55%{stroke-dashoffset:0;opacity:1}75%{opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+
+/* ===== Transición suave entre vistas ===== */
+.main.view-enter{animation:viewIn .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes viewIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== Banda del expediente con brillo que sigue al cursor ===== */
+.chart-band{transition:box-shadow .3s}
+.chart-band:hover{box-shadow:0 14px 44px rgba(14,124,102,.3)}
+.chart-band .avatar{animation:avatarIn .5s cubic-bezier(.2,.9,.3,1.4) both;box-shadow:0 0 0 3px rgba(127,199,181,.35)}
+@keyframes avatarIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ===== Barra de progreso de scroll (arriba) ===== */
+#scroll-progress{position:fixed;top:0;left:0;height:3px;z-index:300;width:0;
+  background:linear-gradient(90deg,#0E7C66,#7FC7B5);box-shadow:0 0 8px rgba(14,124,102,.5);
+  transition:width .1s linear;pointer-events:none}
+
+/* ===== Timeline con puntos que laten al pasar ===== */
+.tl-item::before{transition:transform .25s,box-shadow .25s}
+.tl-item:hover::before{transform:scale(1.4);box-shadow:0 0 10px rgba(14,124,102,.55)}
+.tl-item .tl-body{transition:transform .25s,box-shadow .25s;background:rgba(250,250,246,.85);backdrop-filter:blur(8px)}
+.tl-item:hover .tl-body{transform:translateX(4px);box-shadow:0 6px 18px rgba(22,48,43,.1)}
+
+/* ===== Inputs con foco luminoso ===== */
+.field input:focus,.field select:focus,.field textarea:focus{box-shadow:0 0 0 4px rgba(14,124,102,.12);transition:box-shadow .2s}
+
+/* ===== Tabs con indicador fluido ===== */
+.tabs button{transition:color .2s,transform .15s}
+.tabs button:hover{transform:translateY(-1px)}
+
+/* ===== Empty states que respiran ===== */
+.empty .big{animation:float 3.5s ease-in-out infinite;display:inline-block}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+
+
+/* ===== Suscripción y administración ===== */
+.sub-banner{border-radius:10px;padding:11px 16px;margin-bottom:16px;font-size:13.5px;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  backdrop-filter:blur(10px);animation:riseIn .4s both}
+.sub-banner.warn{background:rgba(251,243,228,.9);border:1px solid #E8D5A8;color:var(--amber)}
+.sub-banner.dang{background:rgba(251,234,232,.9);border:1px solid #EDCBC7;color:var(--red)}
+#bloqueo{position:fixed;inset:0;z-index:400;background:linear-gradient(135deg,rgba(22,48,43,.97),rgba(14,36,31,.97));
+  backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px}
+.bloqueo-card{background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border-radius:16px;padding:30px;
+  max-width:560px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:popIn .4s cubic-bezier(.2,.9,.3,1.2)}
+.planes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.plan{border:2px solid var(--line);border-radius:12px;padding:16px 12px;text-align:center;position:relative;
+  transition:transform .25s,border-color .25s,box-shadow .25s;background:#fff}
+.plan:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 10px 28px rgba(14,124,102,.18)}
+.plan.destacado{border-color:var(--accent);box-shadow:0 8px 24px rgba(14,124,102,.15)}
+.plan .etq{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;
+  font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap}
+.plan .pn{font-family:var(--font-display);font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.plan .pp{font-family:var(--font-display);font-size:23px;font-weight:700;margin:6px 0 2px;letter-spacing:-.5px}
+.plan .pm{font-size:11.5px;color:var(--muted)}
+.plan .ahorro{display:inline-block;margin-top:8px;background:var(--accent-soft);color:var(--accent);
+  font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.admin-row td{font-size:13px}
+.admin-tag{font-size:10px;background:var(--ink);color:#7FC7B5;padding:2px 7px;border-radius:20px;font-weight:700;letter-spacing:.5px}
+
+
+/* ===== Atajos clínicos: chips y plantillas ===== */
+.chips-box{margin-top:6px;border:1px dashed var(--line);border-radius:8px;padding:8px;background:rgba(250,250,246,.7)}
+.chips-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px}
+.chips-tabs button{background:none;border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted);transition:.15s}
+.chips-tabs button:hover{border-color:var(--accent);color:var(--accent)}
+.chips-tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.chips{display:flex;gap:5px;flex-wrap:wrap;max-height:132px;overflow-y:auto}
+.chip{background:#fff;border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:12px;
+  transition:transform .15s,background .15s,border-color .15s,color .15s;cursor:pointer}
+.chip:hover{transform:translateY(-2px);background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip:active{transform:scale(.94)}
+.chip.plantilla{background:var(--blue-soft);border-color:#CCDCEC;color:var(--blue);font-weight:600}
+.chip.plantilla:hover{background:var(--blue);color:#fff}
+.atajo-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.med-sug{font-size:11.5px;color:var(--accent);margin-top:3px;min-height:14px}
+
+/* Scrollbar afinada */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:rgba(14,124,102,.3);border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:rgba(14,124,102,.55)}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}#aurora{display:none}.ecg-path{animation:none;stroke-dashoffset:0}}
+</style>
+</head>
+<body>
+<div id="scroll-progress"></div>
+<div id="aurora"><div class="wl wl1"></div><div class="wl wl2"></div><div class="wl wl3"></div></div>
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Med<span>Consulta</span></h1>
+    <div class="sub">Sistema de gestión de consulta médica</div>
+    <div class="tabs" style="margin-bottom:16px">
+      <button id="auth-tab-login" class="active" onclick="authTab('login')">Iniciar sesión</button>
+      <button id="auth-tab-reg" onclick="authTab('reg')">Crear cuenta</button>
+    </div>
+    <div class="auth-msg" id="auth-msg"></div>
+    <div id="auth-reg-extra" style="display:none">
+      <div class="field"><label>Nombre completo</label><input id="au-nombre" placeholder="Dra. Nombre Apellido"></div>
+      <div class="field"><label>Tipo de cuenta</label>
+        <select id="au-rol" onchange="document.getElementById('au-medcod-box').style.display=this.value==='secretaria'?'block':'none'">
+          <option value="medico">Médico(a)</option>
+          <option value="secretaria">Secretaria / asistente</option>
+        </select></div>
+      <div class="field" id="au-medcod-box" style="display:none">
+        <label>Código del médico</label><input id="au-medcod" placeholder="Pídele su código de vinculación">
+        <div class="hint">El médico lo encuentra en Configuración → Equipo.</div></div>
+    </div>
+    <div class="field"><label>Correo electrónico</label><input type="email" id="au-email" autocomplete="username"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="au-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')authGo()"></div>
+    <button class="btn" id="auth-btn" style="width:100%;padding:11px" onclick="authGo()">Entrar</button>
+  </div>
+</div>
+<div id="app">
+  <aside class="sidebar">
+    <div class="logo"><h1>Med<span>Consulta</span></h1><p>Gestión clínica integral</p>
+      <div class="ecg-wrap"><svg viewBox="0 0 200 26" preserveAspectRatio="none">
+        <path class="ecg-path" d="M0,13 L38,13 L46,13 L52,4 L58,22 L64,13 L72,13 L84,13 L90,9 L96,13 L128,13 L136,13 L142,3 L148,23 L154,13 L200,13"/>
+      </svg></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-footer" id="side-foot"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="print-area"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<script>
+/* =====================================================
+   MedConsulta — Sistema de gestión de consulta médica
+   Módulos: dashboard, pacientes, agenda, consultas,
+   recetas, certificados, facturación, reportes, config
+===================================================== */
+'use strict';
+
+/* ---------- Conexión a Supabase (EDITA ESTAS 2 LÍNEAS) ---------- */
+const SUPABASE_URL='https://jdyhnwenxqxtktjpwboq.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_Te2Aj938fyF0kzHlR6t4-A_K6vHFCfx';
+
+let SB=null, SESION=null; // SESION = {userId, email, rol, nombre, medicoId}
+const TABLAS=['pacientes','citas','consultas','recetas','certificados','facturas'];
+
+let DB={
+  config:{medico:'Dra. Nombre Apellido',especialidad:'Medicina General',exequatur:'000-00',cmd:'',
+    consultorio:'Centro Médico',direccion:'Calle Principal #1, Ciudad',telefono:'809-000-0000',
+    email:'',precioConsulta:2000,moneda:'RD$'},
+  pacientes:[],citas:[],consultas:[],recetas:[],certificados:[],facturas:[],log:[]
+};
+let SHADOW={config:'{}'};
+const esMedico=()=>!SESION||SESION.rol==='medico';
+
+/* ---------- Autenticación ---------- */
+let authMode='login';
+function authTab(m){authMode=m;
+  document.getElementById('auth-tab-login').classList.toggle('active',m==='login');
+  document.getElementById('auth-tab-reg').classList.toggle('active',m==='reg');
+  document.getElementById('auth-reg-extra').style.display=m==='reg'?'block':'none';
+  document.getElementById('auth-btn').textContent=m==='reg'?'Crear cuenta':'Entrar';
+  authMsg('');
+}
+function authMsg(txt,ok){const m=document.getElementById('auth-msg');
+  m.textContent=txt;m.className='auth-msg'+(txt?(ok?' ok':' err'):'')}
+async function authGo(){
+  const email=document.getElementById('au-email').value.trim();
+  const pass=document.getElementById('au-pass').value;
+  if(!email||!pass){authMsg('Correo y contraseña son obligatorios');return}
+  const btn=document.getElementById('auth-btn');btn.disabled=true;btn.textContent='Un momento…';
+  try{
+    if(authMode==='reg'){
+      const nombre=document.getElementById('au-nombre').value.trim();
+      const rol=document.getElementById('au-rol').value;
+      const medcod=document.getElementById('au-medcod').value.trim();
+      if(!nombre){authMsg('Escribe tu nombre');return}
+      if(rol==='secretaria'&&!medcod){authMsg('Necesitas el código del médico para vincularte');return}
+      const {error}=await SB.auth.signUp({email,password:pass,
+        options:{data:{nombre,rol,medico_id:rol==='secretaria'?medcod:''}}});
+      if(error)throw error;
+      authMsg('Cuenta creada. Si tu proyecto pide confirmación por correo, revisa tu bandeja; si no, ya puedes iniciar sesión.',true);
+      authTab('login');
+    }else{
+      const {error}=await SB.auth.signInWithPassword({email,password:pass});
+      if(error)throw error;
+      await entrar();
+    }
+  }catch(e){
+    const m=String(e.message||e);
+    authMsg(m.includes('Invalid login')?'Correo o contraseña incorrectos':
+            m.includes('already registered')?'Ese correo ya tiene cuenta — inicia sesión':
+            'Error: '+m);
+  }finally{btn.disabled=false;btn.textContent=authMode==='reg'?'Crear cuenta':'Entrar'}
+}
+async function entrar(){
+  const {data:{user}}=await SB.auth.getUser();
+  if(!user)return;
+  const {data:perfil,error}=await SB.from('perfiles').select('*').eq('id',user.id).single();
+  if(error||!perfil){authMsg('No se encontró tu perfil. Verifica que ejecutaste el esquema SQL.');await SB.auth.signOut();return}
+  SESION={userId:user.id,email:user.email,rol:perfil.rol,nombre:perfil.nombre,medicoId:perfil.medico_id,esAdmin:!!perfil.es_admin};
+  if(perfil.config&&Object.keys(perfil.config).length)DB.config=Object.assign({},DB.config,perfil.config);
+  await cargarSuscripcion();
+  await cargarDatos();
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').classList.add('autenticado');
+  render();
+  if(!suscActiva())pantallaBloqueo();
+}
+async function salir(){await SB.auth.signOut();location.reload()}
+
+/* ---------- Carga y sincronización con la nube ---------- */
+async function cargarDatos(){
+  for(const t of TABLAS){
+    try{
+      const {data,error}=await SB.from(t).select('id,data');
+      if(error){DB[t]=[];SHADOW[t]={};continue}  // secretarias: consultas denegadas por RLS
+      DB[t]=(data||[]).map(r=>r.data);
+      SHADOW[t]={};(data||[]).forEach(r=>SHADOW[t][r.id]=JSON.stringify(r.data));
+    }catch(e){DB[t]=[];SHADOW[t]={}}
+  }
+  SHADOW.config=JSON.stringify(DB.config);
+  try{
+    const {data:logs}=await SB.from('auditoria').select('t,txt').order('t',{ascending:false}).limit(100);
+    DB.log=logs||[];
+  }catch(e){DB.log=[]}
+}
+let saveTimer=null;
+function saveDB(){
+  clearTimeout(saveTimer);
+  setSync(true);
+  saveTimer=setTimeout(syncAll,400);
+}
+async function syncAll(){
+  if(!SB||!SESION)return;
+  try{
+    for(const t of TABLAS){
+      if(t==='consultas'&&!esMedico())continue;
+      const actuales={};DB[t].forEach(o=>actuales[o.id]=o);
+      const previos=SHADOW[t]||{};
+      const upserts=[];
+      for(const id in actuales){
+        const j=JSON.stringify(actuales[id]);
+        if(previos[id]!==j)upserts.push({id,data:actuales[id]});
+      }
+      const borrar=Object.keys(previos).filter(id=>!actuales[id]);
+      if(upserts.length){
+        const {error}=await SB.from(t).upsert(upserts.map(u=>({id:u.id,data:u.data,actualizado:new Date().toISOString()})));
+        if(error)throw error;
+      }
+      if(borrar.length){
+        const {error}=await SB.from(t).delete().in('id',borrar);
+        if(error)throw error;
+      }
+      SHADOW[t]={};DB[t].forEach(o=>SHADOW[t][o.id]=JSON.stringify(o));
+    }
+    const cj=JSON.stringify(DB.config);
+    if(SHADOW.config!==cj){
+      await SB.from('perfiles').update({config:DB.config}).eq('id',SESION.userId);
+      SHADOW.config=cj;
+    }
+    setSync(false);
+  }catch(e){
+    console.error('Error de sincronización',e);
+    setSync(false);
+    toast('⚠ No se pudo guardar en la nube. Revisa tu conexión.');
+  }
+}
+function setSync(saving){
+  const d=document.getElementById('sync-dot');
+  if(d)d.className='sync-dot'+(saving?' saving':'');
+}
+function logAction(txt){
+  DB.log.unshift({t:new Date().toISOString(),txt:txt+' ('+((SESION&&SESION.nombre)||'')+')'});
+  if(DB.log.length>300)DB.log.length=300;
+  if(SB&&SESION)SB.from('auditoria').insert({txt}).then(()=>{});
+  saveDB();
+}
+
+/* ---------- Utilidades ---------- */
+const $=s=>document.querySelector(s);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtMoney=n=>DB.config.moneda+' '+Number(n||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const hoyISO=()=>new Date().toISOString().slice(0,10);
+function fmtFecha(iso,conHora){
+  if(!iso)return'—';
+  const d=new Date(iso.length===10?iso+'T12:00:00':iso);
+  const f=d.toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'});
+  return conHora?f+' · '+d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}):f;
+}
+function edad(fnac){if(!fnac)return null;const d=new Date(fnac),h=new Date();let e=h.getFullYear()-d.getFullYear();if(h.getMonth()<d.getMonth()||(h.getMonth()===d.getMonth()&&h.getDate()<d.getDate()))e--;return e}
+function iniciales(n){return n.split(' ').filter(Boolean).slice(0,2).map(p=>p[0].toUpperCase()).join('')}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast-root').appendChild(t);setTimeout(()=>t.remove(),2600)}
+function pacienteDe(id){return DB.pacientes.find(p=>p.id===id)}
+function nombrePac(id){const p=pacienteDe(id);return p?p.nombre:'(paciente eliminado)'}
+function telLimpio(t){return String(t||'').replace(/\D/g,'')}
+
+/* ---------- Modal ---------- */
+function openModal(html,wide){
+  const bg=document.createElement('div');bg.className='modal-bg';
+  bg.innerHTML=`<div class="modal${wide?' wide':''}" role="dialog">${html}</div>`;
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove()});
+  $('#modal-root').appendChild(bg);
+  const f=bg.querySelector('input,select,textarea');if(f)f.focus();
+  return bg;
+}
+function closeModal(){const m=$('#modal-root .modal-bg');if(m)m.remove()}
+
+/* ---------- Impresión ---------- */
+function imprimirDoc(html){$('#print-area').innerHTML=html;setTimeout(()=>window.print(),80)}
+function docHeader(){
+  const c=DB.config;
+  return `<div class="doc-head">
+    <div><h1>${esc(c.medico)}</h1>
+    <div class="cred">${esc(c.especialidad)}${c.exequatur?' · Exequátur '+esc(c.exequatur):''}${c.cmd?' · CMD '+esc(c.cmd):''}<br>
+    ${esc(c.consultorio)} · ${esc(c.direccion)}<br>Tel. ${esc(c.telefono)}${c.email?' · '+esc(c.email):''}</div></div>
+    <div class="rx">℞</div></div>`;
+}
+function docFooter(){return `<div class="doc-foot">Documento generado por MedConsulta · ${fmtFecha(hoyISO())} · Este documento es válido con firma y sello del médico.</div>`}
+
+/* ---------- Router ---------- */
+let route={view:'dashboard',params:{}};
+function go(view,params){route={view,params:params||{}};render()}
+
+const NAV=[
+  {sec:'Clínica'},
+  {id:'dashboard',icon:'▦',txt:'Panel principal'},
+  {id:'agenda',icon:'📅',txt:'Agenda'},
+  {id:'pacientes',icon:'👤',txt:'Pacientes'},
+  {id:'consultas',icon:'🩺',txt:'Consultas'},
+  {sec:'Documentos'},
+  {id:'recetas',icon:'℞',txt:'Recetas'},
+  {id:'certificados',icon:'📄',txt:'Certificados'},
+  {id:'atajos',icon:'⚡',txt:'Mis atajos'},
+  {sec:'Administración'},
+  {id:'facturacion',icon:'💵',txt:'Facturación'},
+  {id:'reportes',icon:'📊',txt:'Reportes'},
+  {id:'config',icon:'⚙',txt:'Configuración'},
+  {id:'admin',icon:'🛡',txt:'Administración',soloAdmin:true},
+];
+function renderNav(){
+  const items=NAV.filter(n=>(!n.soloAdmin||(SESION&&SESION.esAdmin))&&(esMedico()||!['consultas','recetas','certificados','atajos'].includes(n.id)));
+  $('#nav').innerHTML=items.map(n=>n.sec
+    ?`<div class="nav-section">${n.sec}</div>`
+    :`<button class="${route.view===n.id||route.view.startsWith(n.id+'-')?'active':''}" onclick="go('${n.id}')">
+        <span class="icon">${n.icon}</span><span class="txt">${n.txt}</span></button>`).join('');
+  $('#side-foot').innerHTML=`<span class="sync-dot" id="sync-dot"></span>${esc((SESION&&SESION.nombre)||DB.config.medico)}<br>
+    <span style="opacity:.8">${SESION?(SESION.rol==='medico'?'Médico(a)':'Secretaria'):''}</span>
+    <br><button class="btn ghost sm" style="color:#7FC7B5;padding:4px 0" onclick="salir()">Cerrar sesión</button>`;
+}
+
+/* ---------- Búsqueda global ---------- */
+function topbar(titulo,sub,acciones){
+  return `<div class="topbar">
+    <div><h2>${titulo}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-global"><input id="gsearch" placeholder="Buscar paciente (nombre, cédula, tel.)" oninput="gSearch(this.value)" autocomplete="off"><div id="gsearch-res"></div></div>
+      ${acciones||''}
+    </div></div>`+(typeof bannerSuscripcion==='function'?bannerSuscripcion():'');
+}
+function gSearch(q){
+  const box=$('#gsearch-res');
+  q=q.trim().toLowerCase();
+  if(q.length<2){box.innerHTML='';return}
+  const res=DB.pacientes.filter(p=>
+    p.nombre.toLowerCase().includes(q)||String(p.cedula||'').includes(q)||telLimpio(p.telefono).includes(q.replace(/\D/g,'')||'###')
+  ).slice(0,8);
+  box.innerHTML=res.length?`<div class="search-results">${res.map(p=>
+    `<div onclick="go('pacientes-detalle',{id:'${p.id}'})"><b>${esc(p.nombre)}</b><br><span style="font-size:12px;color:var(--muted)">${esc(p.cedula||'sin cédula')} · ${esc(p.telefono||'')}</span></div>`).join('')}</div>`
+    :`<div class="search-results"><div style="color:var(--muted)">Sin resultados</div></div>`;
+}
+
+/* =====================================================
+   DASHBOARD
+===================================================== */
+function vDashboard(){
+  const hoy=hoyISO();
+  const citasHoy=DB.citas.filter(c=>c.fecha===hoy&&c.estado!=='cancelada').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const mesAct=hoy.slice(0,7);
+  const ingresosMes=DB.facturas.filter(f=>f.fecha.slice(0,7)===mesAct&&f.estado==='pagada').reduce((s,f)=>s+Number(f.monto),0);
+  const pendientes=DB.facturas.filter(f=>f.estado==='pendiente');
+  const montoPend=pendientes.reduce((s,f)=>s+Number(f.monto),0);
+  const pacMes=DB.pacientes.filter(p=>(p.creado||'').slice(0,7)===mesAct).length;
+  const citasPasadas=DB.citas.filter(c=>c.fecha<hoy||(c.fecha===hoy&&['completada','ausente'].includes(c.estado)));
+  const ausencias=citasPasadas.filter(c=>c.estado==='ausente').length;
+  const tasaAus=citasPasadas.length?Math.round(ausencias/citasPasadas.length*100):0;
+  // Alertas: pacientes sin consulta en 90+ días con condición crónica marcada por seguimiento
+  const alertas=[];
+  if(pendientes.length)alertas.push(`💵 ${pendientes.length} factura(s) pendiente(s) de cobro por ${fmtMoney(montoPend)}`);
+  const sinConfirmar=citasHoy.filter(c=>c.estado==='programada').length;
+  if(sinConfirmar)alertas.push(`📅 ${sinConfirmar} cita(s) de hoy sin confirmar — envía recordatorio`);
+  DB.pacientes.forEach(p=>{
+    if(!p.seguimiento)return;
+    const ult=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    if(!ult)return;
+    const dias=Math.floor((new Date(hoy)-new Date(ult.fecha))/86400000);
+    if(dias>90)alertas.push(`🔔 ${esc(p.nombre)} (en seguimiento) lleva ${dias} días sin consulta`);
+  });
+
+  return topbar('Panel principal',fmtFecha(hoy)+' · Resumen de la consulta',
+    `<button class="btn" onclick="formCita()">+ Nueva cita</button>`)+`
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card kpi"><div class="num">${citasHoy.length}</div><div class="lbl">Citas de hoy</div>
+      <div class="delta ${sinConfirmar?'warn':'up'}">${sinConfirmar?sinConfirmar+' sin confirmar':'todas confirmadas'}</div></div>
+    <div class="card kpi"><div class="num">${fmtMoney(ingresosMes)}</div><div class="lbl">Ingresos del mes (cobrados)</div>
+      <div class="delta ${montoPend?'warn':'up'}">${montoPend?fmtMoney(montoPend)+' por cobrar':'sin cuentas pendientes'}</div></div>
+    <div class="card kpi"><div class="num">${DB.pacientes.length}</div><div class="lbl">Pacientes activos</div>
+      <div class="delta up">+${pacMes} este mes</div></div>
+    <div class="card kpi"><div class="num">${tasaAus}%</div><div class="lbl">Tasa de ausentismo</div>
+      <div class="delta ${tasaAus>20?'down':'up'}">${tasaAus>20?'alto — refuerza recordatorios':'bajo control'}</div></div>
+  </div>
+  ${alertas.length?`<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)">
+    <h3>Alertas</h3>${alertas.map(a=>`<div style="padding:5px 0;font-size:13.5px">${a}</div>`).join('')}</div>`:''}
+  <div class="grid grid-2">
+    <div class="card"><h3>Agenda de hoy <button class="btn ghost sm" onclick="go('agenda')">Ver agenda →</button></h3>
+      ${citasHoy.length?`<table><thead><tr><th>Hora</th><th>Paciente</th><th>Motivo</th><th>Estado</th></tr></thead><tbody>
+      ${citasHoy.map(c=>`<tr class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})">
+        <td><b>${c.hora}</b></td><td>${esc(nombrePac(c.pacienteId))}</td><td>${esc(c.motivo||'')}</td>
+        <td>${badgeCita(c.estado)}</td></tr>`).join('')}</tbody></table>`
+      :`<div class="empty"><div class="big">📅</div>No hay citas programadas para hoy</div>`}
+    </div>
+    <div class="card"><h3>Actividad reciente</h3>
+      ${DB.log.length?DB.log.slice(0,8).map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <span style="color:var(--muted)">${fmtFecha(l.t,true)}</span> — ${esc(l.txt)}</div>`).join('')
+      :`<div class="empty"><div class="big">📋</div>Aún no hay actividad registrada</div>`}
+    </div>
+  </div>`;
+}
+function badgeCita(e){
+  const m={programada:['gray','Programada'],confirmada:['blue','Confirmada'],completada:['green','Completada'],ausente:['red','Ausente'],cancelada:['amber','Cancelada']};
+  const[cl,tx]=m[e]||['gray',e];return `<span class="badge ${cl}">${tx}</span>`;
+}
+
+/* =====================================================
+   PACIENTES
+===================================================== */
+function vPacientes(){
+  const lista=[...DB.pacientes].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return topbar('Pacientes',lista.length+' expediente(s)',
+    `<button class="btn" onclick="formPaciente()">+ Nuevo paciente</button>`)+`
+  <div class="card">
+    ${lista.length?`<table><thead><tr><th>Paciente</th><th>Edad</th><th>Teléfono</th><th>ARS</th><th>Alergias</th><th>Última consulta</th><th></th></tr></thead><tbody>
+    ${lista.map(p=>{
+      const ult=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+      return `<tr class="clickable" onclick="go('pacientes-detalle',{id:'${p.id}'})">
+        <td><b>${esc(p.nombre)}</b><br><span style="font-size:11.5px;color:var(--muted)">${esc(p.cedula||'sin cédula')}</span></td>
+        <td>${edad(p.fnac)??'—'}</td><td>${esc(p.telefono||'—')}</td><td>${esc(p.ars||'Privado')}</td>
+        <td>${p.alergias?`<span class="badge red">⚠ ${esc(p.alergias)}</span>`:'<span class="badge gray">Ninguna</span>'}</td>
+        <td>${ult?fmtFecha(ult.fecha):'—'}</td>
+        <td><button class="btn secondary sm" onclick="event.stopPropagation();formPaciente('${p.id}')">Editar</button></td></tr>`;
+    }).join('')}</tbody></table>`
+    :`<div class="empty"><div class="big">👤</div>No hay pacientes registrados todavía.<br><br>
+      <button class="btn" onclick="formPaciente()">Registrar el primero</button>
+      &nbsp;<button class="btn secondary" onclick="seedDemo()">Cargar datos de ejemplo</button></div>`}
+  </div>`;
+}
+
+function formPaciente(id){
+  const p=id?pacienteDe(id):{};
+  openModal(`<h3>${id?'Editar paciente':'Nuevo paciente'}</h3>
+  <div class="form-grid">
+    <div class="field full"><label>Nombre completo *</label><input id="fp-nombre" value="${esc(p.nombre||'')}"></div>
+    <div class="field"><label>Cédula</label><input id="fp-cedula" value="${esc(p.cedula||'')}" placeholder="000-0000000-0"></div>
+    <div class="field"><label>Fecha de nacimiento</label><input type="date" id="fp-fnac" value="${p.fnac||''}"></div>
+    <div class="field"><label>Sexo</label><select id="fp-sexo">
+      ${['','Femenino','Masculino'].map(s=>`<option ${p.sexo===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>Teléfono (WhatsApp)</label><input id="fp-tel" value="${esc(p.telefono||'')}" placeholder="809-000-0000"></div>
+    <div class="field"><label>Correo</label><input id="fp-email" value="${esc(p.email||'')}"></div>
+    <div class="field"><label>ARS / Seguro</label><input id="fp-ars" value="${esc(p.ars||'')}" placeholder="SeNaSa, Humano, Universal… (vacío = privado)"></div>
+    <div class="field full"><label>Dirección</label><input id="fp-dir" value="${esc(p.direccion||'')}"></div>
+    <div class="field full"><label>⚠ Alergias</label><input id="fp-alergias" value="${esc(p.alergias||'')}" placeholder="Penicilina, sulfas, AINEs…">
+      <div class="hint">Se mostrará como alerta en el expediente y al crear recetas.</div></div>
+    <div class="field full"><label>Antecedentes personales</label><textarea id="fp-antp">${esc(p.antPersonales||'')}</textarea></div>
+    <div class="field full"><label>Antecedentes familiares</label><textarea id="fp-antf">${esc(p.antFamiliares||'')}</textarea></div>
+    <div class="field full"><label>Medicamentos actuales</label><textarea id="fp-meds">${esc(p.medsActuales||'')}</textarea></div>
+    <div class="field full"><label><input type="checkbox" id="fp-seg" ${p.seguimiento?'checked':''} style="width:auto;margin-right:6px">Paciente crónico / en seguimiento (alertar si pasa 90 días sin consulta)</label></div>
+  </div>
+  <div class="modal-actions">
+    ${id?`<button class="btn danger" style="margin-right:auto" onclick="delPaciente('${id}')">Eliminar</button>`:''}
+    <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="savePaciente('${id||''}')">Guardar</button></div>`);
+}
+function savePaciente(id){
+  const nombre=$('#fp-nombre').value.trim();
+  if(!nombre){toast('El nombre es obligatorio');return}
+  const data={nombre,cedula:$('#fp-cedula').value.trim(),fnac:$('#fp-fnac').value,sexo:$('#fp-sexo').value,
+    telefono:$('#fp-tel').value.trim(),email:$('#fp-email').value.trim(),ars:$('#fp-ars').value.trim(),
+    direccion:$('#fp-dir').value.trim(),alergias:$('#fp-alergias').value.trim(),
+    antPersonales:$('#fp-antp').value.trim(),antFamiliares:$('#fp-antf').value.trim(),
+    medsActuales:$('#fp-meds').value.trim(),seguimiento:$('#fp-seg').checked};
+  if(id){Object.assign(pacienteDe(id),data);logAction('Expediente actualizado: '+nombre)}
+  else{data.id=uid();data.creado=hoyISO();DB.pacientes.push(data);logAction('Paciente registrado: '+nombre)}
+  saveDB();closeModal();toast('Paciente guardado');render();
+}
+function delPaciente(id){
+  const p=pacienteDe(id);
+  if(!confirm(`¿Eliminar el expediente de ${p.nombre}? Se conservarán sus consultas y facturas en el historial, pero el expediente desaparecerá. Esta acción no se puede deshacer.`))return;
+  DB.pacientes=DB.pacientes.filter(x=>x.id!==id);
+  logAction('Expediente eliminado: '+p.nombre);saveDB();closeModal();go('pacientes');
+}
+
+/* ---------- Detalle de paciente (expediente) ---------- */
+function vPacienteDetalle(){
+  const p=pacienteDe(route.params.id);
+  if(!p)return `<div class="empty">Paciente no encontrado. <button class="btn ghost" onclick="go('pacientes')">Volver</button></div>`;
+  const consultas=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const recetas=DB.recetas.filter(r=>r.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const facturas=DB.facturas.filter(f=>f.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const citas=DB.citas.filter(c=>c.pacienteId===p.id&&c.fecha>=hoyISO()&&c.estado!=='cancelada').sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const tab=route.params.tab||(esMedico()?'historia':'datos');
+  const wa=telLimpio(p.telefono);
+  return topbar('Expediente clínico','',
+    `<button class="btn secondary" onclick="go('pacientes')">← Pacientes</button>
+     ${esMedico()?`<button class="btn" onclick="formConsulta('${p.id}')">+ Nueva consulta</button>`:''}`)+`
+  <div class="chart-band">
+    <div class="avatar">${iniciales(p.nombre)}</div>
+    <div><h2>${esc(p.nombre)}</h2>
+      <div class="meta">${esc(p.cedula||'Sin cédula')} · ${p.sexo||''} ${edad(p.fnac)!==null?'· '+edad(p.fnac)+' años':''} · ${esc(p.ars||'Privado')} ${p.seguimiento?'· <span class="badge amber">En seguimiento</span>':''}</div></div>
+    <div class="vitals">
+      <div class="vital"><div class="v">${consultas.length}</div><div class="k">Consultas</div></div>
+      <div class="vital"><div class="v">${recetas.length}</div><div class="k">Recetas</div></div>
+      <div class="vital"><div class="v">${citas.length?fmtFecha(citas[0].fecha):'—'}</div><div class="k">Próxima cita</div></div>
+    </div>
+  </div>
+  ${p.alergias?`<div class="alert-strip">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn secondary sm" onclick="formCita('${p.id}')">📅 Agendar cita</button>
+    ${esMedico()?`<button class="btn secondary sm" onclick="formReceta('${p.id}')">℞ Nueva receta</button>
+    <button class="btn secondary sm" onclick="formCertificado('${p.id}')">📄 Certificado</button>`:''}
+    <button class="btn secondary sm" onclick="formFactura('${p.id}')">💵 Facturar</button>
+    ${wa?`<a class="btn secondary sm" style="text-decoration:none" target="_blank" href="https://wa.me/1${wa}?text=${encodeURIComponent('Hola '+p.nombre.split(' ')[0]+', le saludamos de la consulta de '+DB.config.medico+'.')}">💬 WhatsApp</a>`:''}
+  </div>
+  <div class="tabs">
+    ${(esMedico()?[['historia','Historia clínica'],['datos','Datos y antecedentes'],['recetas','Recetas'],['facturas','Facturas']]:[['datos','Datos y antecedentes'],['facturas','Facturas']]).map(([k,t])=>
+      `<button class="${tab===k?'active':''}" onclick="go('pacientes-detalle',{id:'${p.id}',tab:'${k}'})">${t}</button>`).join('')}
+  </div>
+  ${tab==='historia'&&esMedico()?tabHistoria(p,consultas):''}
+  ${tab==='datos'?tabDatos(p):''}
+  ${tab==='recetas'?tabRecetasPac(recetas):''}
+  ${tab==='facturas'?tabFacturasPac(facturas):''}`;
+}
+function tabHistoria(p,consultas){
+  if(!consultas.length)return `<div class="card"><div class="empty"><div class="big">🩺</div>Sin consultas registradas.<br><br><button class="btn" onclick="formConsulta('${p.id}')">Registrar primera consulta</button></div></div>`;
+  return `<div class="card"><div class="timeline">${consultas.map(c=>`
+    <div class="tl-item"><div class="tl-date">${fmtFecha(c.fecha)} ${c.tipo?'· '+esc(c.tipo):''}</div>
+      <div class="tl-body">
+        <b>Motivo:</b> ${esc(c.motivo)}<br>
+        ${c.examen?`<b>Examen / hallazgos:</b> ${esc(c.examen)}<br>`:''}
+        <b>Diagnóstico:</b> ${esc(c.diagnostico)} ${c.cie?`<span class="badge blue">${esc(c.cie)}</span>`:''}<br>
+        ${c.plan?`<b>Plan:</b> ${esc(c.plan)}<br>`:''}
+        ${c.phq9!=null?`<span class="badge ${c.phq9>=15?'red':c.phq9>=10?'amber':'green'}">PHQ-9: ${c.phq9}</span> `:''}
+        ${c.gad7!=null?`<span class="badge ${c.gad7>=15?'red':c.gad7>=10?'amber':'green'}">GAD-7: ${c.gad7}</span>`:''}
+        <div style="margin-top:8px"><button class="btn ghost sm" onclick="formConsulta('${p.id}','${c.id}')">Editar</button>
+        <button class="btn ghost sm" onclick="imprimirConsulta('${c.id}')">Imprimir resumen</button></div>
+      </div></div>`).join('')}</div></div>`;
+}
+function tabDatos(p){
+  const filas=[['Teléfono',p.telefono],['Correo',p.email],['Dirección',p.direccion],['ARS',p.ars||'Privado'],
+    ['Fecha de nacimiento',p.fnac?fmtFecha(p.fnac):''],['Antecedentes personales',p.antPersonales],
+    ['Antecedentes familiares',p.antFamiliares],['Medicamentos actuales',p.medsActuales]];
+  return `<div class="card">
+    ${filas.map(([k,v])=>`<div style="display:flex;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div style="width:210px;font-weight:600;font-size:12.5px;color:var(--ink2)">${k}</div>
+      <div style="flex:1">${esc(v||'—')}</div></div>`).join('')}
+    <div style="margin-top:14px"><button class="btn secondary" onclick="formPaciente('${p.id}')">Editar datos</button></div></div>`;
+}
+function tabRecetasPac(recetas){
+  if(!recetas.length)return `<div class="card"><div class="empty"><div class="big">℞</div>Sin recetas emitidas</div></div>`;
+  return `<div class="card"><table><thead><tr><th>Fecha</th><th>Medicamentos</th><th></th></tr></thead><tbody>
+  ${recetas.map(r=>`<tr><td>${fmtFecha(r.fecha)}</td>
+    <td>${r.items.map(i=>esc(i.med)).join(', ')}</td>
+    <td><button class="btn secondary sm" onclick="imprimirReceta('${r.id}')">🖨 Imprimir</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+function tabFacturasPac(facturas){
+  if(!facturas.length)return `<div class="card"><div class="empty"><div class="big">💵</div>Sin facturas</div></div>`;
+  return `<div class="card"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${facturas.map(f=>filaFactura(f)).join('')}</tbody></table></div>`;
+}
+</script>
+<script>
+/* =====================================================
+   AGENDA
+===================================================== */
+function vAgenda(){
+  const fecha=route.params.fecha||hoyISO();
+  const citas=DB.citas.filter(c=>c.fecha===fecha).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const d=new Date(fecha+'T12:00:00');
+  const mover=n=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+  return topbar('Agenda',d.toLocaleDateString('es-DO',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+    `<button class="btn" onclick="formCita(null,'${fecha}')">+ Nueva cita</button>`)+`
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${mover(-1)}'})">← Anterior</button>
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${hoyISO()}'})">Hoy</button>
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${mover(1)}'})">Siguiente →</button>
+    <input type="date" value="${fecha}" onchange="go('agenda',{fecha:this.value})" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+  </div>
+  <div class="card">
+  ${citas.length?`<table><thead><tr><th>Hora</th><th>Paciente</th><th>Motivo</th><th>Estado</th><th style="width:340px">Acciones</th></tr></thead><tbody>
+  ${citas.map(c=>{
+    const p=pacienteDe(c.pacienteId);const wa=p?telLimpio(p.telefono):'';
+    const msj=p?encodeURIComponent('Hola '+p.nombre.split(' ')[0]+', le recordamos su cita con '+DB.config.medico+' el '+fmtFecha(c.fecha)+' a las '+c.hora+'. Por favor confirme su asistencia. ¡Gracias!'):'';
+    return `<tr><td><b>${c.hora}</b></td>
+    <td class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})"><b>${esc(nombrePac(c.pacienteId))}</b></td>
+    <td>${esc(c.motivo||'')}</td><td>${badgeCita(c.estado)}</td>
+    <td style="white-space:nowrap">
+      ${c.estado==='programada'&&wa?`<a class="btn secondary sm" style="text-decoration:none" target="_blank" href="https://wa.me/1${wa}?text=${msj}" onclick="setCita('${c.id}','confirmada')">💬 Recordar</a> `:''}
+      ${['programada','confirmada'].includes(c.estado)?`
+        <button class="btn sm" onclick="atenderCita('${c.id}')">Atender</button>
+        <button class="btn secondary sm" onclick="setCita('${c.id}','ausente')">Ausente</button>
+        <button class="btn secondary sm" onclick="setCita('${c.id}','cancelada')">Cancelar</button>`:''}
+      <button class="btn ghost sm" onclick="delCita('${c.id}')">✕</button>
+    </td></tr>`;}).join('')}</tbody></table>`
+  :`<div class="empty"><div class="big">📅</div>Sin citas para este día<br><br><button class="btn" onclick="formCita(null,'${fecha}')">Agendar cita</button></div>`}
+  </div>
+  <div class="info-strip" style="margin-top:14px">💡 El botón <b>Recordar</b> abre WhatsApp con el mensaje de recordatorio listo para enviar y marca la cita como confirmada.</div>`;
+}
+function formCita(pacId,fecha){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  openModal(`<h3>Nueva cita</h3><div class="form-grid">
+    <div class="field full"><label>Paciente *</label><select id="fc-pac">
+      ${DB.pacientes.map(p=>`<option value="${p.id}" ${p.id===pacId?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha *</label><input type="date" id="fc-fecha" value="${fecha||hoyISO()}"></div>
+    <div class="field"><label>Hora *</label><input type="time" id="fc-hora" value="09:00"></div>
+    <div class="field full"><label>Motivo</label><input id="fc-motivo" placeholder="Primera vez, seguimiento, resultados…"></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveCita()">Agendar</button></div>`);
+}
+function saveCita(){
+  const c={id:uid(),pacienteId:$('#fc-pac').value,fecha:$('#fc-fecha').value,hora:$('#fc-hora').value,
+    motivo:$('#fc-motivo').value.trim(),estado:'programada'};
+  if(!c.fecha||!c.hora){toast('Fecha y hora son obligatorias');return}
+  if(DB.citas.some(x=>x.fecha===c.fecha&&x.hora===c.hora&&x.estado!=='cancelada')){
+    if(!confirm('Ya existe una cita a esa hora. ¿Agendar de todos modos?'))return;
+  }
+  DB.citas.push(c);logAction('Cita agendada: '+nombrePac(c.pacienteId)+' '+fmtFecha(c.fecha)+' '+c.hora);
+  saveDB();closeModal();toast('Cita agendada');render();
+}
+function setCita(id,estado){const c=DB.citas.find(x=>x.id===id);if(!c)return;c.estado=estado;
+  logAction('Cita '+estado+': '+nombrePac(c.pacienteId));saveDB();render()}
+function delCita(id){if(!confirm('¿Eliminar esta cita?'))return;DB.citas=DB.citas.filter(c=>c.id!==id);saveDB();render()}
+function atenderCita(id){const c=DB.citas.find(x=>x.id===id);if(!c)return;c.estado='completada';saveDB();if(esMedico())formConsulta(c.pacienteId);else render()}
+
+/* =====================================================
+   CONSULTAS (nota clínica + escalas)
+===================================================== */
+function vConsultas(){
+  const lista=[...DB.consultas].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,100);
+  return topbar('Consultas','Historial de notas clínicas',
+    `<button class="btn" onclick="formConsulta()">+ Nueva consulta</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Motivo</th><th>Diagnóstico</th><th></th></tr></thead><tbody>
+  ${lista.map(c=>`<tr class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})">
+    <td>${fmtFecha(c.fecha)}</td><td><b>${esc(nombrePac(c.pacienteId))}</b></td>
+    <td>${esc(c.motivo)}</td><td>${esc(c.diagnostico)} ${c.cie?`<span class="badge blue">${esc(c.cie)}</span>`:''}</td>
+    <td><button class="btn secondary sm" onclick="event.stopPropagation();imprimirConsulta('${c.id}')">🖨</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">🩺</div>Sin consultas registradas</div>`}</div>`;
+}
+const PHQ9=['Poco interés o placer en hacer cosas','Decaído(a), deprimido(a) o sin esperanzas','Problemas para dormir o dormir demasiado','Cansancio o poca energía','Poco apetito o comer en exceso','Sentirse mal consigo mismo(a) o como un fracaso','Dificultad para concentrarse','Lentitud o inquietud notable al moverse/hablar','Pensamientos de que estaría mejor muerto(a) o de hacerse daño'];
+const GAD7=['Sentirse nervioso(a), ansioso(a) o con los nervios de punta','No poder dejar de preocuparse o controlarlo','Preocuparse demasiado por diferentes cosas','Dificultad para relajarse','Inquietud, no poder quedarse quieto(a)','Irritarse o enojarse con facilidad','Miedo de que algo terrible pueda pasar'];
+function bloqueEscala(pref,items,valores){
+  return `<div class="scale-grid" style="margin-top:8px">
+    <div></div><div style="text-align:center;font-size:10.5px;color:var(--muted)">Nunca<br>0</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Varios días<br>1</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Más de la mitad<br>2</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Casi a diario<br>3</div>
+    ${items.map((q,i)=>`<div class="sq">${i+1}. ${q}</div>`+[0,1,2,3].map(v=>
+      `<label><input type="radio" name="${pref}-${i}" value="${v}" ${valores&&valores[i]===v?'checked':''} onchange="calcEscala('${pref}',${items.length})"><span>${v}</span></label>`).join('')).join('')}
+  </div><div style="margin-top:8px">Puntuación: <span class="score-pill" id="${pref}-total">${valores?valores.reduce((a,b)=>a+b,0):'—'}</span> <span id="${pref}-interp" style="font-size:12px;color:var(--muted)"></span></div>`;
+}
+function calcEscala(pref,n){
+  let t=0,c=0;
+  for(let i=0;i<n;i++){const r=document.querySelector(`input[name="${pref}-${i}"]:checked`);if(r){t+=Number(r.value);c++}}
+  document.getElementById(pref+'-total').textContent=c?t:'—';
+  const interp=pref==='phq'
+    ?(t<5?'mínima':t<10?'leve':t<15?'moderada':t<20?'moderadamente grave':'grave')
+    :(t<5?'mínima':t<10?'leve':t<15?'moderada':'grave');
+  document.getElementById(pref+'-interp').textContent=c===n?`(sintomatología ${interp})`:`(${c}/${n} respondidas)`;
+}
+function leerEscala(pref,n){
+  const vals=[];
+  for(let i=0;i<n;i++){const r=document.querySelector(`input[name="${pref}-${i}"]:checked`);if(!r)return null;vals.push(Number(r.value))}
+  return vals;
+}
+function formConsulta(pacId,consId){
+  if(!esMedico()){toast('Solo el médico puede registrar consultas');return}
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const c=consId?DB.consultas.find(x=>x.id===consId):{};
+  const p=pacienteDe(pacId||c.pacienteId);
+  openModal(`<h3>${consId?'Editar consulta':'Nueva consulta'}</h3>
+  ${p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
+  <div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="fn-pac" ${consId?'disabled':''}>
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===(pacId||c.pacienteId)?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fn-fecha" value="${c.fecha||hoyISO()}"></div>
+    <div class="field"><label>Tipo</label><select id="fn-tipo">
+      ${['Primera vez','Seguimiento','Urgencia','Teleconsulta','Resultados'].map(t=>`<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label>Código CIE-10 (opcional)</label><input id="fn-cie" value="${esc(c.cie||'')}" placeholder="F32.1, I10, E11.9…"></div>
+    <div class="field full"><label>Motivo de consulta *</label><textarea id="fn-motivo">${esc(c.motivo||'')}</textarea>
+      ${Object.keys(plantillasDe('motivo')).length?panelPlantillas('fn-motivo',plantillasDe('motivo'),'Mis textos de motivo'):''}
+      ${panelChips('fn-motivo',SINTOMAS,'Síntomas frecuentes — toca para agregar')}</div>
+    <div class="field full"><label>Examen físico / mental y hallazgos</label><textarea id="fn-examen">${esc(c.examen||'')}</textarea>
+      ${panelPlantillas('fn-examen',plantillasDe('examen'),'Plantillas de examen')}
+      ${panelChips('fn-examen',SIGNOS,'Hallazgos — toca para agregar')}</div>
+    <div class="field full"><label>Diagnóstico *</label>
+      <input id="fn-dx" list="dl-dx" value="${esc(c.diagnostico||'')}" oninput="autoDx()" placeholder="Escribe para buscar…">
+      <div class="hint">Al elegir un diagnóstico de la lista, el código CIE-10 se llena solo.</div></div>
+    <div class="field full"><label>Plan de tratamiento e indicaciones</label><textarea id="fn-plan">${esc(c.plan||'')}</textarea>
+      ${panelPlantillas('fn-plan',plantillasDe('plan'),'Plantillas de plan')}</div>
+    ${datalistDx()}
+    <div class="field full"><details ${c.phq9vals?'open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px">📋 Escala PHQ-9 (depresión)</summary>${bloqueEscala('phq',PHQ9,c.phq9vals)}</details></div>
+    <div class="field full"><details ${c.gad7vals?'open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px">📋 Escala GAD-7 (ansiedad)</summary>${bloqueEscala('gad',GAD7,c.gad7vals)}</details></div>
+  </div>
+  <div class="modal-actions">
+    ${consId?`<button class="btn danger" style="margin-right:auto" onclick="delConsulta('${consId}')">Eliminar</button>`:''}
+    <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="saveConsulta('${consId||''}')">Guardar consulta</button></div>`,true);
+  if(c.phq9vals)calcEscala('phq',9);if(c.gad7vals)calcEscala('gad',7);
+}
+function saveConsulta(consId){
+  const motivo=$('#fn-motivo').value.trim(),dx=$('#fn-dx').value.trim();
+  if(!motivo||!dx){toast('Motivo y diagnóstico son obligatorios');return}
+  const phq=leerEscala('phq',9),gad=leerEscala('gad',7);
+  const data={pacienteId:$('#fn-pac').value,fecha:$('#fn-fecha').value,tipo:$('#fn-tipo').value,
+    cie:$('#fn-cie').value.trim(),motivo,examen:$('#fn-examen').value.trim(),diagnostico:dx,plan:$('#fn-plan').value.trim(),
+    phq9:phq?phq.reduce((a,b)=>a+b,0):null,phq9vals:phq,gad7:gad?gad.reduce((a,b)=>a+b,0):null,gad7vals:gad};
+  if(consId){Object.assign(DB.consultas.find(x=>x.id===consId),data);logAction('Consulta editada: '+nombrePac(data.pacienteId))}
+  else{data.id=uid();DB.consultas.push(data);logAction('Consulta registrada: '+nombrePac(data.pacienteId)+' — '+dx)}
+  saveDB();closeModal();toast('Consulta guardada');go('pacientes-detalle',{id:data.pacienteId});
+}
+function delConsulta(id){if(!confirm('¿Eliminar esta consulta del historial?'))return;
+  DB.consultas=DB.consultas.filter(c=>c.id!==id);saveDB();closeModal();render()}
+function imprimirConsulta(id){
+  const c=DB.consultas.find(x=>x.id===id);if(!c)return;const p=pacienteDe(c.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">Resumen de consulta</div>
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(c.fecha)}</span></div>
+    <div class="doc-row"><span><b>Cédula:</b> ${esc(p.cedula||'—')}</span><span><b>Edad:</b> ${edad(p.fnac)??'—'} años</span></div>
+    <div class="doc-body">
+      <p><b>Motivo de consulta:</b> ${esc(c.motivo)}</p>
+      ${c.examen?`<p><b>Hallazgos:</b> ${esc(c.examen)}</p>`:''}
+      <p><b>Diagnóstico:</b> ${esc(c.diagnostico)}${c.cie?' ('+esc(c.cie)+')':''}</p>
+      ${c.plan?`<p><b>Plan e indicaciones:</b> ${esc(c.plan)}</p>`:''}
+      ${c.phq9!=null?`<p><b>PHQ-9:</b> ${c.phq9}/27</p>`:''}${c.gad7!=null?`<p><b>GAD-7:</b> ${c.gad7}/21</p>`:''}
+    </div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+</script>
+<script>
+/* =====================================================
+   RECETAS
+===================================================== */
+function vRecetas(){
+  const lista=[...DB.recetas].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,100);
+  return topbar('Recetas','Recetario digital con membrete',
+    `<button class="btn" onclick="formReceta()">+ Nueva receta</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Medicamentos</th><th></th></tr></thead><tbody>
+  ${lista.map(r=>`<tr><td>${fmtFecha(r.fecha)}</td><td><b>${esc(nombrePac(r.pacienteId))}</b></td>
+    <td>${r.items.map(i=>esc(i.med)).join(', ')}</td>
+    <td style="white-space:nowrap"><button class="btn secondary sm" onclick="imprimirReceta('${r.id}')">🖨 Imprimir</button>
+    <button class="btn ghost sm" onclick="delReceta('${r.id}')">✕</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">℞</div>Sin recetas emitidas</div>`}</div>`;
+}
+function filaMedHTML(i,item){
+  item=item||{};
+  return `<div class="form-grid" style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px" data-med-row>
+    <div class="field full"><label>Medicamento ${i+1}</label>
+      <input class="fr-med" list="dl-meds" value="${esc(item.med||'')}" placeholder="Escribe para buscar en el vademécum…" oninput="autoMed(this)">
+      <div class="med-sug"></div></div>
+    <div class="field"><label>Dosis / frecuencia</label><input class="fr-dosis" value="${esc(item.dosis||'')}" placeholder="1 tableta cada 24 h en la mañana"></div>
+    <div class="field"><label>Duración / cantidad</label><input class="fr-dur" value="${esc(item.dur||'')}" placeholder="por 30 días · #30"></div>
+  </div>`;
+}
+function formReceta(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const p=pacienteDe(pacId);
+  openModal(`<h3>Nueva receta</h3>
+  <div id="fr-alergia">${p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS DEL PACIENTE: ${esc(p.alergias)}</div>`:''}</div>
+  <div class="form-grid" style="margin-bottom:10px">
+    <div class="field"><label>Paciente *</label><select id="fr-pac" onchange="frAlergia()">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fr-fecha" value="${hoyISO()}"></div>
+  </div>
+  ${datalistMeds()}
+  ${misAtajos().esquemas.length?`<div class="chips-box" style="margin-bottom:10px"><div class="atajo-lbl">Mis esquemas — aplica todo el tratamiento de un clic</div>
+    <div class="chips">${misAtajos().esquemas.map((e,i)=>
+      `<span class="chip plantilla" onclick="aplicarEsquema(${i})">⚡ ${esc(e.nombre)} (${e.items.length})</span>`).join('')}</div></div>`:''}
+  <div id="fr-meds">${filaMedHTML(0)}</div>
+  <button class="btn secondary sm" onclick="addMedRow()">+ Agregar medicamento</button>
+  <div class="field" style="margin-top:12px"><label>Indicaciones generales (opcional)</label><textarea id="fr-indic" placeholder="Tomar con alimentos, evitar alcohol, retornar en 4 semanas…"></textarea></div>
+  <div class="modal-actions">
+  <button class="btn secondary" style="margin-right:auto" onclick="guardarComoEsquema()">⚡ Guardar como esquema</button>
+  <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveReceta()">Guardar e imprimir</button></div>`,true);
+}
+function leerItemsReceta(){
+  return [...document.querySelectorAll('[data-med-row]')].map(r=>({
+    med:r.querySelector('.fr-med').value.trim(),dosis:r.querySelector('.fr-dosis').value.trim(),dur:r.querySelector('.fr-dur').value.trim()
+  })).filter(i=>i.med);
+}
+function aplicarEsquema(i){
+  const e=misAtajos().esquemas[i];if(!e)return;
+  const box=document.getElementById('fr-meds');
+  const vacia=leerItemsReceta().length===0;
+  if(vacia)box.innerHTML='';
+  const desde=box.querySelectorAll('[data-med-row]').length;
+  e.items.forEach((it,j)=>box.insertAdjacentHTML('beforeend',filaMedHTML(desde+j,{med:it.med,dosis:it.dosis,dur:it.dur})));
+  const ind=document.getElementById('fr-indic');
+  if(e.indicaciones&&!ind.value.trim())ind.value=e.indicaciones;
+  toast('Esquema "'+e.nombre+'" aplicado');
+}
+function guardarComoEsquema(){
+  const items=leerItemsReceta();
+  if(!items.length){toast('Agrega al menos un medicamento primero');return}
+  const nombre=prompt('Nombre del esquema (ej. "Depresión — inicio", "IVU no complicada"):');
+  if(!nombre||!nombre.trim())return;
+  const a=misAtajos();
+  a.esquemas.push({nombre:nombre.trim(),items,indicaciones:document.getElementById('fr-indic').value.trim()});
+  logAction('Esquema personal creado: '+nombre.trim());
+  saveDB();toast('Esquema guardado — lo verás en tus próximas recetas');
+}
+function frAlergia(){const p=pacienteDe($('#fr-pac').value);
+  $('#fr-alergia').innerHTML=p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS DEL PACIENTE: ${esc(p.alergias)}</div>`:''}
+function addMedRow(){const box=$('#fr-meds');const n=box.querySelectorAll('[data-med-row]').length;
+  box.insertAdjacentHTML('beforeend',filaMedHTML(n))}
+function saveReceta(){
+  const pacId=$('#fr-pac').value,p=pacienteDe(pacId);
+  const items=[...document.querySelectorAll('[data-med-row]')].map(r=>({
+    med:r.querySelector('.fr-med').value.trim(),dosis:r.querySelector('.fr-dosis').value.trim(),dur:r.querySelector('.fr-dur').value.trim()
+  })).filter(i=>i.med);
+  if(!items.length){toast('Agrega al menos un medicamento');return}
+  // Alerta cruzada simple contra alergias registradas
+  if(p&&p.alergias){
+    const alg=p.alergias.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(s=>s.length>3);
+    const choque=items.find(i=>alg.some(a=>i.med.toLowerCase().includes(a)));
+    if(choque&&!confirm('⚠ POSIBLE CONFLICTO: "'+choque.med+'" coincide con una alergia registrada ('+p.alergias+'). ¿Continuar de todos modos?'))return;
+  }
+  const r={id:uid(),pacienteId:pacId,fecha:$('#fr-fecha').value,items,indicaciones:$('#fr-indic').value.trim()};
+  DB.recetas.push(r);logAction('Receta emitida: '+nombrePac(pacId));saveDB();closeModal();render();
+  imprimirReceta(r.id);
+}
+function delReceta(id){if(!confirm('¿Eliminar esta receta?'))return;DB.recetas=DB.recetas.filter(r=>r.id!==id);saveDB();render()}
+function imprimirReceta(id){
+  const r=DB.recetas.find(x=>x.id===id);if(!r)return;const p=pacienteDe(r.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(r.fecha)}</span></div>
+    <div class="doc-row"><span><b>Edad:</b> ${edad(p.fnac)??'—'} años</span><span><b>Cédula:</b> ${esc(p.cedula||'—')}</span></div>
+    <div class="doc-body"><ol>
+      ${r.items.map(i=>`<li><b>${esc(i.med)}</b><br>${esc(i.dosis)}${i.dur?' — '+esc(i.dur):''}</li>`).join('')}
+    </ol>${r.indicaciones?`<p style="margin-top:14px"><b>Indicaciones:</b> ${esc(r.indicaciones)}</p>`:''}</div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+
+/* =====================================================
+   CERTIFICADOS
+===================================================== */
+function vCertificados(){
+  const lista=[...DB.certificados].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return topbar('Certificados médicos','Constancias y certificados imprimibles',
+    `<button class="btn" onclick="formCertificado()">+ Nuevo certificado</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Tipo</th><th></th></tr></thead><tbody>
+  ${lista.map(c=>`<tr><td>${fmtFecha(c.fecha)}</td><td><b>${esc(nombrePac(c.pacienteId))}</b></td><td>${esc(c.tipo)}</td>
+    <td style="white-space:nowrap"><button class="btn secondary sm" onclick="imprimirCert('${c.id}')">🖨 Imprimir</button>
+    <button class="btn ghost sm" onclick="delCert('${c.id}')">✕</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">📄</div>Sin certificados emitidos</div>`}</div>`;
+}
+function formCertificado(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const plantillas={
+    'Certificado médico':'Certifico que he examinado en el día de hoy a [PACIENTE], quien se encuentra en condiciones de salud aptas para [ACTIVIDAD].',
+    'Reposo / licencia':'Certifico que [PACIENTE] fue atendido(a) en esta consulta y por su condición de salud amerita reposo por [N] días a partir de la fecha.',
+    'Constancia de asistencia':'Hago constar que [PACIENTE] asistió a consulta médica en el día de hoy en horario de [HORA].'
+  };
+  openModal(`<h3>Nuevo certificado</h3><div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="fx-pac">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fx-fecha" value="${hoyISO()}"></div>
+    <div class="field full"><label>Tipo</label><select id="fx-tipo" onchange="document.getElementById('fx-texto').value=this.dataset[this.selectedIndex]||''">
+      ${Object.keys(plantillas).map(t=>`<option>${t}</option>`).join('')}</select></div>
+    <div class="field full"><label>Texto del certificado *</label><textarea id="fx-texto" rows="6">${plantillas['Certificado médico']}</textarea>
+      <div class="hint">Reemplaza los campos entre corchetes antes de imprimir.</div></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveCert()">Guardar e imprimir</button></div>`);
+  const sel=$('#fx-tipo');Object.values(plantillas).forEach((v,i)=>sel.dataset[i]=v);
+}
+function saveCert(){
+  const c={id:uid(),pacienteId:$('#fx-pac').value,fecha:$('#fx-fecha').value,tipo:$('#fx-tipo').value,texto:$('#fx-texto').value.trim()};
+  if(!c.texto){toast('El texto es obligatorio');return}
+  DB.certificados.push(c);logAction('Certificado emitido: '+c.tipo+' — '+nombrePac(c.pacienteId));
+  saveDB();closeModal();render();imprimirCert(c.id);
+}
+function delCert(id){if(!confirm('¿Eliminar?'))return;DB.certificados=DB.certificados.filter(c=>c.id!==id);saveDB();render()}
+function imprimirCert(id){
+  const c=DB.certificados.find(x=>x.id===id);if(!c)return;const p=pacienteDe(c.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">${esc(c.tipo)}</div>
+    <div class="doc-body" style="min-height:140px">
+      <p>A quien pueda interesar:</p><br>
+      <p style="text-align:justify">${esc(c.texto).replace(/\[PACIENTE\]/g,'<b>'+esc(p.nombre)+'</b>'+(p.cedula?', cédula '+esc(p.cedula):''))}</p>
+      <br><p>Se expide el presente a solicitud de la parte interesada, en ${esc(DB.config.direccion.split(',').pop()||'')} a los ${new Date(c.fecha+'T12:00:00').getDate()} días del mes de ${new Date(c.fecha+'T12:00:00').toLocaleDateString('es-DO',{month:'long'})} de ${c.fecha.slice(0,4)}.</p>
+    </div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+
+/* =====================================================
+   FACTURACIÓN
+===================================================== */
+function filaFactura(f){
+  return `<tr><td>${fmtFecha(f.fecha)}</td><td>${esc(f.concepto)}${f.ncf?`<br><span style="font-size:11px;color:var(--muted)">NCF: ${esc(f.ncf)}</span>`:''}</td>
+    <td><b>${fmtMoney(f.monto)}</b>${f.ars?`<br><span style="font-size:11px;color:var(--muted)">${esc(f.ars)}</span>`:''}</td>
+    <td>${f.estado==='pagada'?'<span class="badge green">Pagada</span>':'<span class="badge amber">Pendiente</span>'}</td>
+    <td style="white-space:nowrap">${f.estado==='pendiente'?`<button class="btn sm" onclick="pagarFactura('${f.id}')">Marcar pagada</button> `:''}
+    <button class="btn secondary sm" onclick="imprimirFactura('${f.id}')">🖨</button>
+    <button class="btn ghost sm" onclick="delFactura('${f.id}')">✕</button></td></tr>`;
+}
+function vFacturacion(){
+  const lista=[...DB.facturas].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const pend=lista.filter(f=>f.estado==='pendiente').reduce((s,f)=>s+Number(f.monto),0);
+  const mesAct=hoyISO().slice(0,7);
+  const cobradoMes=lista.filter(f=>f.estado==='pagada'&&f.fecha.slice(0,7)===mesAct).reduce((s,f)=>s+Number(f.monto),0);
+  return topbar('Facturación','Cobros, recibos y cuentas por cobrar',
+    `<button class="btn" onclick="formFactura()">+ Nueva factura</button>`)+`
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card kpi"><div class="num">${fmtMoney(cobradoMes)}</div><div class="lbl">Cobrado este mes</div></div>
+    <div class="card kpi"><div class="num" style="color:${pend?'var(--amber)':'inherit'}">${fmtMoney(pend)}</div><div class="lbl">Por cobrar</div></div>
+    <div class="card kpi"><div class="num">${lista.length}</div><div class="lbl">Facturas emitidas</div></div>
+  </div>
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${lista.map(f=>filaFactura(f).replace('<td>'+fmtFecha(f.fecha)+'</td>','<td>'+fmtFecha(f.fecha)+'<br><b style="font-size:12px">'+esc(nombrePac(f.pacienteId))+'</b></td>')).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">💵</div>Sin facturas registradas</div>`}</div>`;
+}
+function formFactura(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const p=pacienteDe(pacId);
+  openModal(`<h3>Nueva factura / recibo</h3><div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="ff-pac">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="ff-fecha" value="${hoyISO()}"></div>
+    <div class="field full"><label>Concepto *</label><input id="ff-conc" value="Consulta médica"></div>
+    <div class="field"><label>Monto (${DB.config.moneda}) *</label><input type="number" id="ff-monto" value="${DB.config.precioConsulta}" min="0" step="any"></div>
+    <div class="field"><label>Estado</label><select id="ff-estado"><option value="pagada">Pagada</option><option value="pendiente">Pendiente de cobro</option></select></div>
+    <div class="field"><label>ARS / forma de pago</label><input id="ff-ars" value="${esc(p&&p.ars?p.ars:'')}" placeholder="Efectivo, tarjeta, SeNaSa…"></div>
+    <div class="field"><label>NCF (comprobante fiscal, opcional)</label><input id="ff-ncf" placeholder="B0100000001"></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveFactura()">Guardar</button></div>`);
+}
+function saveFactura(){
+  const monto=Number($('#ff-monto').value);
+  if(!monto||monto<=0){toast('Monto inválido');return}
+  const f={id:uid(),pacienteId:$('#ff-pac').value,fecha:$('#ff-fecha').value,concepto:$('#ff-conc').value.trim()||'Consulta',
+    monto,estado:$('#ff-estado').value,ars:$('#ff-ars').value.trim(),ncf:$('#ff-ncf').value.trim(),num:(DB.facturas.length+1).toString().padStart(5,'0')};
+  DB.facturas.push(f);logAction('Factura #'+f.num+' — '+nombrePac(f.pacienteId)+' '+fmtMoney(monto));
+  saveDB();closeModal();toast('Factura registrada');render();
+}
+function pagarFactura(id){const f=DB.facturas.find(x=>x.id===id);if(!f)return;f.estado='pagada';
+  logAction('Cobro registrado: factura #'+f.num);saveDB();render();toast('Cobro registrado')}
+function delFactura(id){if(!confirm('¿Eliminar esta factura?'))return;DB.facturas=DB.facturas.filter(f=>f.id!==id);saveDB();render()}
+function imprimirFactura(id){
+  const f=DB.facturas.find(x=>x.id===id);if(!f)return;const p=pacienteDe(f.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">Recibo / Factura Nº ${f.num}</div>
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(f.fecha)}</span></div>
+    ${f.ncf?`<div class="doc-row"><span><b>NCF:</b> ${esc(f.ncf)}</span><span></span></div>`:''}
+    <div class="doc-body" style="min-height:80px"><table><tr><th>Concepto</th><th style="width:160px">Monto</th></tr>
+      <tr><td>${esc(f.concepto)}</td><td>${fmtMoney(f.monto)}</td></tr>
+      <tr><td style="text-align:right"><b>Total</b></td><td><b>${fmtMoney(f.monto)}</b></td></tr></table>
+      <p style="margin-top:10px">Estado: <b>${f.estado==='pagada'?'PAGADA':'PENDIENTE DE PAGO'}</b>${f.ars?' · '+esc(f.ars):''}</p></div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}</div></div>
+    ${docFooter()}</div>`);
+}
+</script>
+<script>
+/* =====================================================
+   REPORTES
+===================================================== */
+function vReportes(){
+  // Ingresos últimos 6 meses
+  const meses=[];const d=new Date();
+  for(let i=5;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);
+    meses.push({key:x.toISOString().slice(0,7),lbl:x.toLocaleDateString('es-DO',{month:'short'})})}
+  const ingresos=meses.map(m=>DB.facturas.filter(f=>f.estado==='pagada'&&f.fecha.slice(0,7)===m.key).reduce((s,f)=>s+Number(f.monto),0));
+  const maxIng=Math.max(...ingresos,1);
+  const consultasMes=meses.map(m=>DB.consultas.filter(c=>c.fecha.slice(0,7)===m.key).length);
+  const maxCon=Math.max(...consultasMes,1);
+  // Top diagnósticos
+  const dxCount={};DB.consultas.forEach(c=>{const k=(c.diagnostico||'').trim();if(k)dxCount[k]=(dxCount[k]||0)+1});
+  const topDx=Object.entries(dxCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  // ARS
+  const arsCount={};DB.facturas.filter(f=>f.estado==='pagada').forEach(f=>{const k=f.ars||'Privado / efectivo';arsCount[k]=(arsCount[k]||0)+Number(f.monto)});
+  const topArs=Object.entries(arsCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  // Ausentismo por mes
+  const aus=meses.map(m=>{
+    const del=DB.citas.filter(c=>c.fecha.slice(0,7)===m.key&&['completada','ausente'].includes(c.estado));
+    return del.length?Math.round(del.filter(c=>c.estado==='ausente').length/del.length*100):0});
+  return topbar('Reportes','Inteligencia de la consulta — últimos 6 meses','')+`
+  <div class="grid grid-2" style="margin-bottom:16px">
+    <div class="card"><h3>Ingresos cobrados por mes</h3>
+      <div class="bars">${meses.map((m,i)=>`<div class="bar-col"><div class="bv">${ingresos[i]?Math.round(ingresos[i]/1000)+'k':''}</div>
+        <div class="bar" style="height:${Math.max(ingresos[i]/maxIng*100,2)}%"></div><div class="bl">${m.lbl}</div></div>`).join('')}</div></div>
+    <div class="card"><h3>Consultas realizadas por mes</h3>
+      <div class="bars">${meses.map((m,i)=>`<div class="bar-col"><div class="bv">${consultasMes[i]||''}</div>
+        <div class="bar" style="height:${Math.max(consultasMes[i]/maxCon*100,2)}%;background:var(--blue)"></div><div class="bl">${m.lbl}</div></div>`).join('')}</div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="card"><h3>Diagnósticos más frecuentes</h3>
+      ${topDx.length?topDx.map(([dx,n])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(dx)}</span><b>${n}</b></div>`).join(''):'<div class="empty">Sin datos aún</div>'}</div>
+    <div class="card"><h3>Ingresos por ARS / forma de pago</h3>
+      ${topArs.length?topArs.map(([a,m])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(a)}</span><b>${fmtMoney(m)}</b></div>`).join(''):'<div class="empty">Sin datos aún</div>'}
+      <h3 style="margin-top:18px">Ausentismo por mes</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${meses.map((m,i)=>`<span class="badge ${aus[i]>20?'red':aus[i]>10?'amber':'green'}">${m.lbl}: ${aus[i]}%</span>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+/* =====================================================
+   CONFIGURACIÓN
+===================================================== */
+function vConfig(){
+  const c=DB.config;
+  return topbar('Configuración','Datos del consultorio, respaldo y seguridad','')+`
+  <div class="grid grid-2">
+    <div class="card"><h3>Datos del médico y consultorio</h3>
+      <div class="form-grid">
+        <div class="field full"><label>Nombre del médico</label><input id="cf-medico" value="${esc(c.medico)}"></div>
+        <div class="field"><label>Especialidad</label><input id="cf-esp" value="${esc(c.especialidad)}"></div>
+        <div class="field"><label>Exequátur</label><input id="cf-exe" value="${esc(c.exequatur)}"></div>
+        <div class="field"><label>Nº CMD (opcional)</label><input id="cf-cmd" value="${esc(c.cmd||'')}"></div>
+        <div class="field"><label>Teléfono</label><input id="cf-tel" value="${esc(c.telefono)}"></div>
+        <div class="field full"><label>Consultorio / centro</label><input id="cf-cons" value="${esc(c.consultorio)}"></div>
+        <div class="field full"><label>Dirección</label><input id="cf-dir" value="${esc(c.direccion)}"></div>
+        <div class="field"><label>Correo</label><input id="cf-email" value="${esc(c.email||'')}"></div>
+        <div class="field"><label>Precio consulta por defecto</label><input type="number" id="cf-precio" value="${c.precioConsulta}"></div>
+      </div>
+      <div style="margin-top:14px"><button class="btn" onclick="saveConfig()">Guardar configuración</button></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h3>Equipo</h3>
+        <p style="font-size:13px;color:var(--muted)">Sesión: <b>${esc(SESION.email)}</b> (${SESION.rol==='medico'?'médico':'secretaria'})</p>
+        ${SESION.rol==='medico'?`<p style="font-size:13px;color:var(--muted);margin-top:8px">Para dar acceso a tu secretaria, pídele que cree una cuenta tipo <b>Secretaria</b> con este código de vinculación:</p>
+        <div style="background:var(--accent-soft);border:1px dashed var(--accent);border-radius:8px;padding:10px;margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all">${SESION.userId}</div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">La secretaria podrá manejar pacientes, agenda y facturación, pero <b>no</b> podrá leer las notas clínicas (protegido por la base de datos).</p>`:''}
+      </div>
+      <div class="card" style="margin-bottom:16px"><h3>Respaldo de datos</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Exporta todos los datos (pacientes, consultas, recetas, facturas) a un archivo JSON. Guárdalo en un lugar seguro con regularidad. Puedes importarlo para restaurar o migrar.</p>
+        <button class="btn secondary" onclick="exportar()">⬇ Exportar respaldo</button>
+        <button class="btn secondary" onclick="document.getElementById('cf-import').click()">⬆ Importar respaldo</button>
+        <input type="file" id="cf-import" accept=".json" style="display:none" onchange="importar(this)">
+      </div>
+      <div class="card" style="margin-bottom:16px"><h3>Registro de auditoría</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Últimas acciones registradas en el sistema (${DB.log.length}).</p>
+        <div style="max-height:220px;overflow-y:auto">
+        ${DB.log.slice(0,40).map(l=>`<div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12px">
+          <span style="color:var(--muted)">${fmtFecha(l.t,true)}</span> — ${esc(l.txt)}</div>`).join('')||'<div class="empty">Sin actividad</div>'}</div>
+      </div>
+      <div class="card"><h3>Zona de riesgo</h3>
+        <button class="btn secondary" onclick="seedDemo()">Cargar datos de ejemplo</button>
+        <button class="btn danger" onclick="borrarTodo()">Borrar todos los datos</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">Los datos se guardan cifrados en tránsito en tu proyecto de Supabase, con aislamiento por médico y roles a nivel de base de datos. Activa los respaldos automáticos en Supabase (Database → Backups) y usa contraseñas fuertes (Ley 172-13).</p>
+      </div>
+    </div>
+  </div>`;
+}
+function saveConfig(){
+  Object.assign(DB.config,{medico:$('#cf-medico').value.trim(),especialidad:$('#cf-esp').value.trim(),
+    exequatur:$('#cf-exe').value.trim(),cmd:$('#cf-cmd').value.trim(),telefono:$('#cf-tel').value.trim(),
+    consultorio:$('#cf-cons').value.trim(),direccion:$('#cf-dir').value.trim(),email:$('#cf-email').value.trim(),
+    precioConsulta:Number($('#cf-precio').value)||0});
+  logAction('Configuración actualizada');saveDB();toast('Configuración guardada');renderNav();
+}
+function exportar(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='respaldo-medconsulta-'+hoyISO()+'.json';a.click();
+  logAction('Respaldo exportado');toast('Respaldo descargado');
+}
+function importar(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+    const d=JSON.parse(r.result);
+    if(!d.pacientes||!Array.isArray(d.pacientes))throw new Error('Formato inválido');
+    if(!confirm('Se reemplazarán TODOS los datos actuales con el respaldo ('+d.pacientes.length+' pacientes). ¿Continuar?'))return;
+    DB=d;saveDB();toast('Respaldo restaurado');render();
+  }catch(e){toast('El archivo no es un respaldo válido')}};
+  r.readAsText(file);input.value='';
+}
+function borrarTodo(){
+  if(!confirm('¿Borrar TODOS los datos del sistema? Esta acción no se puede deshacer. Exporta un respaldo primero si tienes dudas.'))return;
+  if(!confirm('Confirmación final: se eliminarán todos los pacientes, consultas, recetas y facturas.'))return;
+  const cfg=DB.config;
+  DB={config:cfg,pacientes:[],citas:[],consultas:[],recetas:[],certificados:[],facturas:[],log:[]};
+  saveDB();toast('Datos eliminados');go('dashboard');
+}
+
+/* ---------- Datos de ejemplo ---------- */
+function seedDemo(){
+  if(DB.pacientes.length&&!confirm('Se agregarán pacientes de ejemplo a los datos existentes. ¿Continuar?'))return;
+  const hoy=new Date();const dISO=n=>{const x=new Date(hoy);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+  const p1={id:uid(),creado:dISO(-120),nombre:'María Altagracia Peña',cedula:'402-1234567-8',fnac:'1985-03-12',sexo:'Femenino',telefono:'809-555-1234',ars:'SeNaSa',direccion:'Bonao, Monseñor Nouel',alergias:'Penicilina',antPersonales:'Hipertensión arterial en tratamiento',antFamiliares:'Madre con DM2',medsActuales:'Losartán 50 mg/día',seguimiento:true,email:''};
+  const p2={id:uid(),creado:dISO(-60),nombre:'José Manuel Rodríguez',cedula:'001-7654321-0',fnac:'1992-11-04',sexo:'Masculino',telefono:'829-555-9876',ars:'',direccion:'La Vega',alergias:'',antPersonales:'',antFamiliares:'',medsActuales:'',seguimiento:false,email:''};
+  const p3={id:uid(),creado:dISO(-15),nombre:'Carmen Rosa Jiménez',cedula:'048-2223334-5',fnac:'2001-07-22',sexo:'Femenino',telefono:'849-555-4321',ars:'Humano',direccion:'Bonao',alergias:'Sulfas, ibuprofeno',antPersonales:'Episodio depresivo previo (2023)',antFamiliares:'',medsActuales:'',seguimiento:true,email:''};
+  DB.pacientes.push(p1,p2,p3);
+  DB.consultas.push(
+    {id:uid(),pacienteId:p1.id,fecha:dISO(-95),tipo:'Primera vez',motivo:'Cefalea y cifras tensionales elevadas',examen:'TA 150/95, resto sin hallazgos',diagnostico:'Hipertensión arterial esencial',cie:'I10',plan:'Losartán 50 mg/día, dieta hiposódica, control en 1 mes',phq9:null,gad7:null},
+    {id:uid(),pacienteId:p1.id,fecha:dISO(-30),tipo:'Seguimiento',motivo:'Control de HTA',examen:'TA 130/85',diagnostico:'HTA controlada',cie:'I10',plan:'Continuar igual, control en 3 meses',phq9:null,gad7:null},
+    {id:uid(),pacienteId:p3.id,fecha:dISO(-10),tipo:'Primera vez',motivo:'Tristeza persistente, insomnio y anhedonia de 6 semanas',examen:'Examen mental: ánimo deprimido, sin ideación suicida activa',diagnostico:'Episodio depresivo moderado',cie:'F32.1',plan:'Sertralina 50 mg/día, psicoterapia semanal, retorno en 4 semanas',phq9:14,phq9vals:[2,2,2,2,1,2,1,1,1],gad7:9,gad7vals:[2,1,2,1,1,1,1]}
+  );
+  DB.citas.push(
+    {id:uid(),pacienteId:p2.id,fecha:hoyISO(),hora:'09:00',motivo:'Chequeo general',estado:'confirmada'},
+    {id:uid(),pacienteId:p3.id,fecha:hoyISO(),hora:'10:30',motivo:'Seguimiento — 4 semanas',estado:'programada'},
+    {id:uid(),pacienteId:p1.id,fecha:dISO(3),hora:'11:00',motivo:'Control HTA',estado:'programada'},
+    {id:uid(),pacienteId:p2.id,fecha:dISO(-7),hora:'09:00',motivo:'Chequeo',estado:'ausente'}
+  );
+  DB.recetas.push({id:uid(),pacienteId:p3.id,fecha:dISO(-10),items:[{med:'Sertralina 50 mg tabletas',dosis:'1 tableta cada 24 h en la mañana',dur:'por 30 días · #30'}],indicaciones:'Evitar alcohol. Puede causar náuseas los primeros días. Retornar en 4 semanas.'});
+  DB.facturas.push(
+    {id:uid(),num:'00001',pacienteId:p1.id,fecha:dISO(-95),concepto:'Consulta primera vez',monto:2500,estado:'pagada',ars:'SeNaSa',ncf:''},
+    {id:uid(),num:'00002',pacienteId:p1.id,fecha:dISO(-30),concepto:'Consulta seguimiento',monto:2000,estado:'pagada',ars:'SeNaSa',ncf:''},
+    {id:uid(),num:'00003',pacienteId:p3.id,fecha:dISO(-10),concepto:'Consulta primera vez',monto:3000,estado:'pendiente',ars:'Humano',ncf:''}
+  );
+  logAction('Datos de ejemplo cargados');saveDB();toast('Datos de ejemplo cargados');render();
+}
+
+
+/* ---------- Planes y suscripción ---------- */
+const PLANES=[
+  {id:'mensual',   nombre:'Mensual',    meses:1,  precio:1500,  ahorro:0},
+  {id:'trimestral',nombre:'Trimestral', meses:3,  precio:4050,  ahorro:10},
+  {id:'anual',     nombre:'Anual',      meses:12, precio:14400, ahorro:20}
+];
+let SUSC=null; // {plan, vence, estado, dias}
+
+async function cargarSuscripcion(){
+  try{
+    const {data}=await SB.from('suscripciones').select('*').eq('medico_id',SESION.medicoId||SESION.userId).maybeSingle();
+    if(data){
+      const dias=Math.ceil((new Date(data.vence+'T12:00:00')-new Date(hoyISO()+'T12:00:00'))/86400000);
+      SUSC={plan:data.plan,vence:data.vence,estado:data.estado,dias};
+    }
+  }catch(e){SUSC=null}
+}
+function suscActiva(){
+  if(SESION&&SESION.esAdmin)return true;
+  if(!SUSC)return true; // si no se pudo leer, no bloquear al usuario
+  return SUSC.estado==='activa'&&SUSC.dias>=0;
+}
+function bannerSuscripcion(){
+  if(!SUSC||!esMedico()||(SESION&&SESION.esAdmin))return '';
+  if(SUSC.estado!=='activa')return `<div class="sub-banner dang"><span>⚠ Tu cuenta está ${SUSC.estado}. Comunícate para reactivarla.</span></div>`;
+  if(SUSC.dias<0)return '';
+  if(SUSC.dias<=7){
+    const et=SUSC.plan==='prueba'?'Tu período de prueba':'Tu suscripción';
+    return `<div class="sub-banner ${SUSC.dias<=3?'dang':'warn'}">
+      <span>${SUSC.dias===0?`${et} vence hoy`:`${et} vence en ${SUSC.dias} día${SUSC.dias===1?'':'s'}`} (${fmtFecha(SUSC.vence)})</span>
+      <button class="btn sm" onclick="verPlanes()">Ver planes</button></div>`;
+  }
+  return '';
+}
+function tarjetasPlanes(){
+  return `<div class="planes">${PLANES.map(p=>`
+    <div class="plan${p.id==='anual'?' destacado':''}">
+      ${p.id==='anual'?'<div class="etq">2 MESES GRATIS</div>':''}
+      <div class="pn">${p.nombre}</div>
+      <div class="pp">${fmtMoney(p.precio)}</div>
+      <div class="pm">${fmtMoney(Math.round(p.precio/p.meses))} por mes</div>
+      ${p.ahorro?`<div class="ahorro">Ahorras ${p.ahorro}%</div>`:''}
+    </div>`).join('')}</div>`;
+}
+function verPlanes(){
+  openModal(`<h3>Planes de suscripción</h3>
+    <p style="font-size:13.5px;color:var(--muted)">Elige el plan que prefieras y comunícate para activarlo. Mientras más largo el período, menor el costo mensual.</p>
+    ${tarjetasPlanes()}
+    <div class="info-strip">Para activar o renovar, escribe a <b>${esc(DB.config.email||'shaelvargx3@gmail.com')}</b> o por WhatsApp. La activación es inmediata una vez confirmado el pago.</div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal()">Entendido</button></div>`,true);
+}
+function pantallaBloqueo(){
+  const b=document.createElement('div');b.id='bloqueo';
+  b.innerHTML=`<div class="bloqueo-card">
+    <h2 style="font-family:var(--font-display);font-size:20px;margin-bottom:4px">Tu suscripción venció</h2>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:6px">
+      ${SUSC&&SUSC.estado!=='activa'?'Tu cuenta está '+SUSC.estado+'.':'Venció el '+fmtFecha(SUSC?SUSC.vence:hoyISO())+'.'}
+      Tus datos están seguros y volverán a estar disponibles al renovar.</p>
+    ${tarjetasPlanes()}
+    <div class="info-strip">Para renovar, comunícate por WhatsApp o escribe a <b>shaelvargx3@gmail.com</b>.</div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="btn secondary" onclick="salir()">Cerrar sesión</button>
+      <button class="btn" onclick="location.reload()">Ya renové, recargar</button></div>
+  </div>`;
+  document.body.appendChild(b);
+}
+
+/* ---------- Panel de administración (solo superadmin) ---------- */
+let ADMIN_DATA=null;
+function vAdmin(){
+  return topbar('Administración','Cuentas y suscripciones',
+    `<button class="btn secondary" onclick="cargarAdmin()">↻ Actualizar</button>`)+
+    `<div id="admin-box"><div class="card"><div class="empty"><div class="big">⏳</div>Cargando cuentas…</div></div></div>`;
+}
+async function cargarAdmin(){
+  const box=document.getElementById('admin-box');if(!box)return;
+  try{
+    const {data,error}=await SB.rpc('admin_resumen');
+    if(error)throw error;
+    ADMIN_DATA=data||[];
+    pintarAdmin();
+  }catch(e){
+    box.innerHTML=`<div class="card"><div class="alert-strip">No se pudo cargar: ${esc(e.message||e)}<br>
+      Verifica que ejecutaste la migración de suscripciones en Supabase.</div></div>`;
+  }
+}
+function pintarAdmin(){
+  const box=document.getElementById('admin-box');if(!box)return;
+  const medicos=ADMIN_DATA.filter(r=>r.rol==='medico');
+  const activos=medicos.filter(r=>r.estado==='activa'&&r.dias_restantes>=0);
+  const pagos=medicos.filter(r=>['mensual','trimestral','anual'].includes(r.plan));
+  const mrr=pagos.reduce((s,r)=>{
+    const p=PLANES.find(x=>x.id===r.plan);return s+(p?p.precio/p.meses:0)},0);
+  const porVencer=medicos.filter(r=>r.dias_restantes>=0&&r.dias_restantes<=7);
+  box.innerHTML=`
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card kpi"><div class="num">${medicos.length}</div><div class="lbl">Médicos registrados</div></div>
+    <div class="card kpi"><div class="num">${activos.length}</div><div class="lbl">Suscripciones activas</div></div>
+    <div class="card kpi"><div class="num">${fmtMoney(Math.round(mrr))}</div><div class="lbl">Ingreso mensual recurrente</div></div>
+    <div class="card kpi"><div class="num">${porVencer.length}</div><div class="lbl">Vencen en 7 días</div>
+      ${porVencer.length?'<div class="delta warn">requieren seguimiento</div>':'<div class="delta up">sin pendientes</div>'}</div>
+  </div>
+  <div class="card"><h3>Cuentas</h3>
+  <div style="overflow-x:auto"><table><thead><tr>
+    <th>Cuenta</th><th>Rol</th><th>Plan</th><th>Vence</th><th>Estado</th><th>Uso</th><th>Acciones</th>
+  </tr></thead><tbody>
+  ${ADMIN_DATA.map(r=>{
+    const venc=r.dias_restantes;
+    const est=r.rol!=='medico'?'<span class="badge gray">—</span>'
+      :r.estado!=='activa'?`<span class="badge red">${esc(r.estado)}</span>`
+      :venc<0?'<span class="badge red">Vencida</span>'
+      :venc<=7?`<span class="badge amber">${venc} día${venc===1?'':'s'}</span>`
+      :'<span class="badge green">Activa</span>';
+    return `<tr class="admin-row">
+      <td><b>${esc(r.nombre||'(sin nombre)')}</b>${r.es_admin?' <span class="admin-tag">ADMIN</span>':''}
+        <br><span style="font-size:11.5px;color:var(--muted)">${esc(r.email||'')}</span></td>
+      <td>${r.rol==='medico'?'Médico':'Secretaria'}</td>
+      <td>${r.plan?esc(r.plan):'—'}</td>
+      <td>${r.vence?fmtFecha(r.vence):'—'}</td>
+      <td>${est}</td>
+      <td style="font-size:11.5px;color:var(--muted)">${r.n_pacientes} pac · ${r.n_consultas} cons<br>${r.n_citas} citas · ${r.n_facturas} fact</td>
+      <td style="white-space:nowrap">${r.rol==='medico'?`
+        <button class="btn sm" onclick="adminRenovar('${r.id}','${esc(r.nombre||r.email)}')">Renovar</button>
+        ${r.estado==='activa'
+          ?`<button class="btn secondary sm" onclick="adminEstado('${r.id}','suspendida')">Suspender</button>`
+          :`<button class="btn secondary sm" onclick="adminEstado('${r.id}','activa')">Reactivar</button>`}`:''}
+      </td></tr>`;
+  }).join('')}
+  </tbody></table></div></div>
+  <div class="info-strip" style="margin-top:14px">🔒 Como administrador puedes gestionar cuentas y suscripciones, pero no leer las historias clínicas de otros médicos — la base de datos lo impide. Es tu mejor argumento de venta frente a un médico que pregunte por la privacidad.</div>`;
+  animarKPIs();
+}
+function adminRenovar(id,nombre){
+  openModal(`<h3>Renovar suscripción</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">Cuenta: <b>${esc(nombre)}</b></p>
+    <div class="form-grid">
+      <div class="field"><label>Plan</label><select id="ar-plan" onchange="arMonto()">
+        ${PLANES.map(p=>`<option value="${p.id}">${p.nombre} — ${fmtMoney(p.precio)}</option>`).join('')}
+        <option value="cortesia">Cortesía (12 meses, sin cargo)</option>
+        <option value="prueba">Extender prueba (14 días)</option>
+      </select></div>
+      <div class="field"><label>Monto cobrado</label><input type="number" id="ar-monto" value="1500"></div>
+      <div class="field full"><label>Nota (opcional)</label><input id="ar-nota" placeholder="Transferencia Banreservas, ref. 12345"></div>
+    </div>
+    <div class="info-strip">El tiempo se suma a partir del vencimiento actual, así que renovar antes no le quita días al cliente.</div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="confirmarRenovar('${id}')">Confirmar renovación</button></div>`);
+}
+function arMonto(){
+  const p=PLANES.find(x=>x.id===document.getElementById('ar-plan').value);
+  document.getElementById('ar-monto').value=p?p.precio:0;
+}
+async function confirmarRenovar(id){
+  const plan=document.getElementById('ar-plan').value;
+  const monto=Number(document.getElementById('ar-monto').value)||0;
+  const nota=document.getElementById('ar-nota').value.trim();
+  try{
+    const {error}=await SB.rpc('admin_renovar',{p_medico:id,p_plan:plan,p_monto:monto,p_notas:nota});
+    if(error)throw error;
+    closeModal();toast('Suscripción actualizada');cargarAdmin();
+  }catch(e){toast('Error: '+(e.message||e))}
+}
+async function adminEstado(id,estado){
+  if(estado==='suspendida'&&!confirm('¿Suspender esta cuenta? El médico no podrá usar el sistema hasta reactivarla. Sus datos se conservan.'))return;
+  try{
+    const {error}=await SB.rpc('admin_estado',{p_medico:id,p_estado:estado});
+    if(error)throw error;
+    toast(estado==='activa'?'Cuenta reactivada':'Cuenta suspendida');cargarAdmin();
+  }catch(e){toast('Error: '+(e.message||e))}
+}
+
+/* =====================================================================
+   CATÁLOGO CLÍNICO — atajos para escribir menos
+   Las dosis son presentaciones habituales de adulto como punto de
+   partida editable; el médico ajusta según cada paciente.
+===================================================================== */
+const VADEMECUM=[
+ // ---- Analgésicos y antiinflamatorios ----
+ {g:'Analgésicos / AINEs',m:'Acetaminofén 500 mg tabletas',d:'1 tableta cada 8 horas',u:'por 5 días · #15'},
+ {g:'Analgésicos / AINEs',m:'Ibuprofeno 400 mg tabletas',d:'1 tableta cada 8 horas con alimentos',u:'por 5 días · #15'},
+ {g:'Analgésicos / AINEs',m:'Diclofenaco sódico 50 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'por 5 días · #10'},
+ {g:'Analgésicos / AINEs',m:'Naproxeno 500 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'por 5 días · #10'},
+ {g:'Analgésicos / AINEs',m:'Ketorolaco 10 mg tabletas',d:'1 tableta cada 8 horas',u:'máximo 5 días · #10'},
+ {g:'Analgésicos / AINEs',m:'Acetaminofén + tramadol 325/37.5 mg',d:'1 tableta cada 8 horas',u:'por 3 días · #9'},
+ // ---- Antibióticos ----
+ {g:'Antibióticos',m:'Amoxicilina 500 mg cápsulas',d:'1 cápsula cada 8 horas',u:'por 7 días · #21'},
+ {g:'Antibióticos',m:'Amoxicilina + ácido clavulánico 875/125 mg',d:'1 tableta cada 12 horas con alimentos',u:'por 7 días · #14'},
+ {g:'Antibióticos',m:'Azitromicina 500 mg tabletas',d:'1 tableta cada 24 horas',u:'por 3 días · #3'},
+ {g:'Antibióticos',m:'Cefalexina 500 mg cápsulas',d:'1 cápsula cada 6 horas',u:'por 7 días · #28'},
+ {g:'Antibióticos',m:'Ciprofloxacino 500 mg tabletas',d:'1 tableta cada 12 horas',u:'por 7 días · #14'},
+ {g:'Antibióticos',m:'Doxiciclina 100 mg cápsulas',d:'1 cápsula cada 12 horas',u:'por 7 días · #14'},
+ {g:'Antibióticos',m:'Metronidazol 500 mg tabletas',d:'1 tableta cada 8 horas (evitar alcohol)',u:'por 7 días · #21'},
+ {g:'Antibióticos',m:'Nitrofurantoína 100 mg cápsulas',d:'1 cápsula cada 12 horas',u:'por 5 días · #10'},
+ {g:'Antibióticos',m:'Trimetoprim/sulfametoxazol 160/800 mg',d:'1 tableta cada 12 horas',u:'por 7 días · #14'},
+ {g:'Antibióticos',m:'Clindamicina 300 mg cápsulas',d:'1 cápsula cada 8 horas',u:'por 7 días · #21'},
+ // ---- Gastrointestinal ----
+ {g:'Gastrointestinal',m:'Omeprazol 20 mg cápsulas',d:'1 cápsula en ayunas cada 24 horas',u:'por 30 días · #30'},
+ {g:'Gastrointestinal',m:'Esomeprazol 40 mg cápsulas',d:'1 cápsula en ayunas cada 24 horas',u:'por 30 días · #30'},
+ {g:'Gastrointestinal',m:'Metoclopramida 10 mg tabletas',d:'1 tableta cada 8 horas antes de comidas',u:'por 3 días · #9'},
+ {g:'Gastrointestinal',m:'Ondansetrón 8 mg tabletas',d:'1 tableta cada 8 horas si náuseas',u:'por 3 días · #9'},
+ {g:'Gastrointestinal',m:'Butilescopolamina 10 mg tabletas',d:'1 tableta cada 8 horas si dolor cólico',u:'por 3 días · #9'},
+ {g:'Gastrointestinal',m:'Sales de rehidratación oral',d:'1 sobre en 1 litro de agua, tomar a libre demanda',u:'mientras persista la diarrea'},
+ {g:'Gastrointestinal',m:'Loperamida 2 mg cápsulas',d:'2 cápsulas al inicio, luego 1 tras cada evacuación',u:'máximo 8 al día · #10'},
+ {g:'Gastrointestinal',m:'Simeticona 125 mg cápsulas',d:'1 cápsula cada 8 horas después de comidas',u:'por 7 días · #21'},
+ // ---- Cardiovascular y metabólico ----
+ {g:'Cardiovascular',m:'Losartán 50 mg tabletas',d:'1 tableta cada 24 horas',u:'uso continuo · #30'},
+ {g:'Cardiovascular',m:'Enalapril 10 mg tabletas',d:'1 tableta cada 12 horas',u:'uso continuo · #60'},
+ {g:'Cardiovascular',m:'Amlodipino 5 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'uso continuo · #30'},
+ {g:'Cardiovascular',m:'Hidroclorotiazida 25 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'uso continuo · #30'},
+ {g:'Cardiovascular',m:'Metoprolol succinato 50 mg tabletas',d:'1 tableta cada 24 horas',u:'uso continuo · #30'},
+ {g:'Cardiovascular',m:'Carvedilol 6.25 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'uso continuo · #60'},
+ {g:'Cardiovascular',m:'Atorvastatina 20 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'uso continuo · #30'},
+ {g:'Cardiovascular',m:'Ácido acetilsalicílico 81 mg tabletas',d:'1 tableta cada 24 horas con alimentos',u:'uso continuo · #30'},
+ {g:'Endocrino',m:'Metformina 850 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'uso continuo · #60'},
+ {g:'Endocrino',m:'Glibenclamida 5 mg tabletas',d:'1 tableta cada 24 horas antes del desayuno',u:'uso continuo · #30'},
+ {g:'Endocrino',m:'Levotiroxina 50 mcg tabletas',d:'1 tableta en ayunas 30 min antes del desayuno',u:'uso continuo · #30'},
+ {g:'Endocrino',m:'Empagliflozina 10 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'uso continuo · #30'},
+ // ---- Respiratorio y alergia ----
+ {g:'Respiratorio / alergia',m:'Loratadina 10 mg tabletas',d:'1 tableta cada 24 horas',u:'por 10 días · #10'},
+ {g:'Respiratorio / alergia',m:'Cetirizina 10 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'por 10 días · #10'},
+ {g:'Respiratorio / alergia',m:'Salbutamol inhalador 100 mcg',d:'2 disparos cada 6 horas si falta de aire',u:'1 inhalador'},
+ {g:'Respiratorio / alergia',m:'Budesonida/formoterol 160/4.5 mcg inhalador',d:'1 inhalación cada 12 horas',u:'1 inhalador'},
+ {g:'Respiratorio / alergia',m:'Montelukast 10 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'por 30 días · #30'},
+ {g:'Respiratorio / alergia',m:'Prednisona 20 mg tabletas',d:'1 tableta cada 24 horas después del desayuno',u:'por 5 días · #5'},
+ {g:'Respiratorio / alergia',m:'Ambroxol jarabe 30 mg/5 mL',d:'10 mL cada 8 horas',u:'por 5 días · 1 frasco'},
+ // ---- Salud mental ----
+ {g:'Antidepresivos',m:'Sertralina 50 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Fluoxetina 20 mg cápsulas',d:'1 cápsula cada 24 horas en la mañana',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Escitalopram 10 mg tabletas',d:'1 tableta cada 24 horas',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Paroxetina 20 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Venlafaxina XR 75 mg cápsulas',d:'1 cápsula cada 24 horas con alimentos',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Duloxetina 30 mg cápsulas',d:'1 cápsula cada 24 horas',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Bupropión XL 150 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Mirtazapina 30 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Amitriptilina 25 mg tabletas',d:'1 tableta en la noche',u:'por 30 días · #30'},
+ {g:'Antidepresivos',m:'Trazodona 50 mg tabletas',d:'1 tableta en la noche',u:'por 30 días · #30'},
+ {g:'Ansiolíticos / hipnóticos',m:'Clonazepam 0.5 mg tabletas',d:'1 tableta en la noche',u:'por 15 días · #15'},
+ {g:'Ansiolíticos / hipnóticos',m:'Alprazolam 0.5 mg tabletas',d:'1 tableta cada 12 horas',u:'por 10 días · #20'},
+ {g:'Ansiolíticos / hipnóticos',m:'Lorazepam 1 mg tabletas',d:'1 tableta en la noche',u:'por 10 días · #10'},
+ {g:'Ansiolíticos / hipnóticos',m:'Hidroxizina 25 mg tabletas',d:'1 tableta cada 8 horas si ansiedad',u:'por 10 días · #30'},
+ {g:'Ansiolíticos / hipnóticos',m:'Zolpidem 10 mg tabletas',d:'1 tableta al acostarse',u:'por 10 días · #10'},
+ {g:'Antipsicóticos',m:'Quetiapina 25 mg tabletas',d:'1 tableta en la noche',u:'por 30 días · #30'},
+ {g:'Antipsicóticos',m:'Quetiapina 100 mg tabletas',d:'1 tableta en la noche',u:'por 30 días · #30'},
+ {g:'Antipsicóticos',m:'Risperidona 2 mg tabletas',d:'1 tableta cada 24 horas en la noche',u:'por 30 días · #30'},
+ {g:'Antipsicóticos',m:'Olanzapina 5 mg tabletas',d:'1 tableta en la noche',u:'por 30 días · #30'},
+ {g:'Antipsicóticos',m:'Aripiprazol 10 mg tabletas',d:'1 tableta cada 24 horas en la mañana',u:'por 30 días · #30'},
+ {g:'Antipsicóticos',m:'Haloperidol 5 mg tabletas',d:'1 tableta cada 12 horas',u:'por 15 días · #30'},
+ {g:'Antipsicóticos',m:'Biperideno 2 mg tabletas',d:'1 tableta cada 12 horas',u:'por 15 días · #30'},
+ {g:'Estabilizadores del ánimo',m:'Ácido valproico 500 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'por 30 días · #60'},
+ {g:'Estabilizadores del ánimo',m:'Lamotrigina 25 mg tabletas',d:'1 tableta cada 24 horas (titulación lenta)',u:'por 14 días · #14'},
+ {g:'Estabilizadores del ánimo',m:'Carbamazepina 200 mg tabletas',d:'1 tableta cada 12 horas',u:'por 30 días · #60'},
+ {g:'Estabilizadores del ánimo',m:'Carbonato de litio 300 mg tabletas',d:'1 tableta cada 12 horas con alimentos',u:'por 30 días · #60'},
+ // ---- Suplementos y otros ----
+ {g:'Suplementos',m:'Ácido fólico 5 mg tabletas',d:'1 tableta cada 24 horas',u:'por 30 días · #30'},
+ {g:'Suplementos',m:'Sulfato ferroso 300 mg tabletas',d:'1 tableta cada 24 horas en ayunas con jugo cítrico',u:'por 60 días · #60'},
+ {g:'Suplementos',m:'Complejo B tabletas',d:'1 tableta cada 24 horas',u:'por 30 días · #30'},
+ {g:'Suplementos',m:'Vitamina D3 2000 UI cápsulas',d:'1 cápsula cada 24 horas con alimentos',u:'por 60 días · #60'},
+ {g:'Suplementos',m:'Carbonato de calcio + vitamina D',d:'1 tableta cada 12 horas con alimentos',u:'por 30 días · #60'}
+];
+
+/* Motivos de consulta y síntomas frecuentes */
+const SINTOMAS={
+ 'General':['Fiebre','Astenia / cansancio','Pérdida de peso','Aumento de peso','Malestar general','Escalofríos','Sudoración nocturna','Falta de apetito'],
+ 'Respiratorio':['Tos seca','Tos productiva','Dificultad respiratoria','Dolor de garganta','Congestión nasal','Rinorrea','Dolor torácico al respirar','Sibilancias'],
+ 'Cardiovascular':['Dolor torácico','Palpitaciones','Edema en miembros inferiores','Disnea de esfuerzo','Mareo','Síncope'],
+ 'Digestivo':['Dolor abdominal','Náuseas','Vómitos','Diarrea','Estreñimiento','Acidez / pirosis','Distensión abdominal','Sangrado digestivo'],
+ 'Neurológico':['Cefalea','Mareo / vértigo','Visión borrosa','Parestesias','Debilidad focal','Temblor','Convulsiones','Alteración de la memoria'],
+ 'Urinario / ginecológico':['Disuria','Polaquiuria','Hematuria','Dolor lumbar','Flujo vaginal','Amenorrea','Sangrado uterino anormal'],
+ 'Musculoesquelético':['Dolor articular','Dolor lumbar','Dolor cervical','Limitación de movimiento','Inflamación articular','Calambres'],
+ 'Salud mental':['Ánimo deprimido','Anhedonia','Ansiedad','Insomnio de conciliación','Insomnio de mantenimiento','Hipersomnia','Irritabilidad','Crisis de pánico','Ideación suicida','Ideas de minusvalía','Aislamiento social','Dificultad para concentrarse','Pensamientos obsesivos','Alucinaciones','Ideas delirantes','Consumo de alcohol o sustancias']
+};
+
+/* Signos y hallazgos de examen */
+const SIGNOS={
+ 'Signos vitales':['TA normal','TA elevada','Taquicardia','Bradicardia','Taquipnea','Febril','Afebril','Saturación normal'],
+ 'General':['Buen estado general','Regular estado general','Palidez cutánea','Ictericia','Deshidratación leve','Adenopatías cervicales'],
+ 'Cardiopulmonar':['Ruidos cardíacos rítmicos sin soplos','Soplo sistólico','Murmullo vesicular conservado','Crepitantes basales','Sibilancias espiratorias','Hipoventilación'],
+ 'Abdomen':['Blando, depresible, no doloroso','Doloroso a la palpación','Ruidos hidroaéreos presentes','Hepatomegalia','Signo de Murphy positivo','Blumberg positivo'],
+ 'Neurológico':['Consciente y orientado','Glasgow 15/15','Sin déficit focal','Reflejos conservados','Marcha normal','Pupilas isocóricas reactivas'],
+ 'Examen mental':['Ánimo eutímico','Ánimo deprimido','Ánimo elevado','Afecto congruente','Afecto aplanado','Discurso coherente','Discurso disgregado','Sin ideación suicida','Con ideación suicida','Sin alteraciones sensoperceptivas','Con alucinaciones auditivas','Juicio conservado','Juicio alterado','Introspección conservada','Introspección ausente','Orientado en tiempo, espacio y persona']
+};
+
+/* Diagnósticos frecuentes con CIE-10 */
+const DIAGNOSTICOS=[
+ {d:'Infección respiratoria aguda',c:'J06.9'},{d:'Faringoamigdalitis aguda',c:'J02.9'},
+ {d:'Rinitis alérgica',c:'J30.4'},{d:'Asma bronquial',c:'J45.9'},{d:'Neumonía adquirida en la comunidad',c:'J18.9'},
+ {d:'EPOC',c:'J44.9'},{d:'Hipertensión arterial esencial',c:'I10'},{d:'Diabetes mellitus tipo 2',c:'E11.9'},
+ {d:'Dislipidemia',c:'E78.5'},{d:'Obesidad',c:'E66.9'},{d:'Hipotiroidismo',c:'E03.9'},
+ {d:'Gastritis aguda',c:'K29.7'},{d:'Enfermedad por reflujo gastroesofágico',c:'K21.9'},
+ {d:'Síndrome de intestino irritable',c:'K58.9'},{d:'Gastroenteritis aguda',c:'A09'},
+ {d:'Infección de vías urinarias',c:'N39.0'},{d:'Lumbalgia',c:'M54.5'},{d:'Cefalea tensional',c:'G44.2'},
+ {d:'Migraña',c:'G43.9'},{d:'Anemia ferropénica',c:'D50.9'},{d:'Osteoartrosis',c:'M19.9'},
+ {d:'Dermatitis atópica',c:'L20.9'},{d:'Vaginitis',c:'N76.0'},
+ // Salud mental
+ {d:'Episodio depresivo leve',c:'F32.0'},{d:'Episodio depresivo moderado',c:'F32.1'},
+ {d:'Episodio depresivo grave',c:'F32.2'},{d:'Trastorno depresivo recurrente',c:'F33.9'},
+ {d:'Trastorno de ansiedad generalizada',c:'F41.1'},{d:'Trastorno de pánico',c:'F41.0'},
+ {d:'Trastorno mixto ansioso-depresivo',c:'F41.2'},{d:'Trastorno adaptativo',c:'F43.2'},
+ {d:'Trastorno de estrés postraumático',c:'F43.1'},{d:'Trastorno obsesivo-compulsivo',c:'F42.9'},
+ {d:'Trastorno afectivo bipolar',c:'F31.9'},{d:'Esquizofrenia',c:'F20.9'},
+ {d:'Trastorno psicótico agudo',c:'F23.9'},{d:'Insomnio no orgánico',c:'F51.0'},
+ {d:'Trastorno por consumo de alcohol',c:'F10.2'},{d:'Trastorno por déficit de atención',c:'F90.0'},
+ {d:'Demencia tipo Alzheimer',c:'F00.9'},{d:'Trastorno de personalidad límite',c:'F60.3'}
+];
+
+/* Plantillas de examen y plan */
+const PLANTILLAS_EXAMEN={
+ 'Examen físico normal':'Paciente en buen estado general, consciente, orientado, hidratado. Signos vitales estables. Cabeza y cuello sin adenopatías. Cardiopulmonar: ruidos cardíacos rítmicos sin soplos, murmullo vesicular conservado en ambos campos. Abdomen blando, depresible, no doloroso, sin visceromegalias. Extremidades sin edema, pulsos presentes y simétricos. Neurológico sin déficit focal.',
+ 'Examen mental completo':'Paciente vigil, orientado en tiempo, espacio y persona. Aspecto acorde a edad, adecuado aseo y vestimenta. Actitud cooperadora. Discurso espontáneo, coherente, de volumen y velocidad normales. Ánimo referido: ___. Afecto: ___, congruente con el discurso. Pensamiento de curso y contenido sin alteraciones, sin ideas delirantes. Sensopercepción sin alucinaciones. Sin ideación suicida ni homicida al momento de la evaluación. Juicio de realidad conservado. Introspección: ___. Memoria y atención conservadas.',
+ 'Signos vitales':'TA: ___/___ mmHg · FC: ___ lpm · FR: ___ rpm · Temp: ___ °C · SatO2: ___% · Peso: ___ kg · Talla: ___ m · IMC: ___',
+ 'Control de embarazo':'Altura uterina: ___ cm. Frecuencia cardíaca fetal: ___ lpm. Movimientos fetales presentes. Presentación: ___. Sin actividad uterina. Sin sangrado ni pérdida de líquido. Edemas: ___.'
+};
+const PLANTILLAS_PLAN={
+ 'Manejo sintomático':'Reposo relativo, abundante líquido. Manejo sintomático según receta adjunta. Retornar si empeora, aparece fiebre alta persistente o dificultad respiratoria. Control en 7 días o antes si es necesario.',
+ 'Control de crónico':'Continuar tratamiento actual sin cambios. Dieta baja en sal y grasas, actividad física 30 minutos al día 5 veces por semana. Automedición y registro en libreta. Traer analíticas a la próxima cita. Control en 3 meses.',
+ 'Estudios solicitados':'Se solicitan: hemograma completo, glicemia en ayunas, perfil lipídico, creatinina, urea, orina completa. Retornar con resultados para evaluación.',
+ 'Inicio de antidepresivo':'Se inicia tratamiento farmacológico según receta. Se explica al paciente que el efecto pleno aparece entre la segunda y cuarta semana, y que puede haber molestias leves los primeros días. Se indica no suspender por cuenta propia. Se recomienda psicoterapia concomitante, higiene del sueño y actividad física regular. Control en 4 semanas o antes si hay empeoramiento.',
+ 'Seguimiento en salud mental':'Continuar tratamiento a dosis actual, con buena tolerancia. Se refuerza adherencia y hábitos de sueño. Se aplican escalas de seguimiento. Se indica acudir de inmediato ante ideación suicida o empeoramiento marcado. Próximo control en 4 semanas.',
+ 'Referimiento':'Se refiere a ___ para evaluación y manejo especializado. Se entrega resumen clínico. Continuar tratamiento actual hasta la valoración.',
+ 'Medidas generales':'Se explican medidas higiénico-dietéticas, signos de alarma y necesidad de acudir a urgencias si aparecen. Paciente comprende las indicaciones y acepta el plan propuesto.'
+};
+
+
+/* ---------- Atajos personales del médico ---------- */
+function misAtajos(){
+  if(!DB.config.atajos)DB.config.atajos={meds:[],plantillas:[],esquemas:[]};
+  const a=DB.config.atajos;
+  a.meds=a.meds||[];a.plantillas=a.plantillas||[];a.esquemas=a.esquemas||[];
+  return a;
+}
+function todosLosMeds(){return misAtajos().meds.concat(VADEMECUM)}
+function plantillasDe(campo){
+  // campo: 'motivo' | 'examen' | 'plan'
+  const propias=misAtajos().plantillas.filter(p=>p.campo===campo);
+  const base=campo==='examen'?PLANTILLAS_EXAMEN:campo==='plan'?PLANTILLAS_PLAN:{};
+  const out={};
+  propias.forEach(p=>out['★ '+p.nombre]=p.texto);
+  Object.keys(base).forEach(k=>out[k]=base[k]);
+  return out;
+}
+let _PLT={};
+function plantillaTxt(clave){return _PLT[clave]||''}
+
+/* ---------- Motor de atajos ---------- */
+function agregarTexto(id,txt,sep){
+  const el=document.getElementById(id);if(!el)return;
+  const v=el.value.trim();
+  sep=sep||', ';
+  el.value=v?(v.replace(/[.,;\s]+$/,'')+sep+txt.charAt(0).toLowerCase()+txt.slice(1)):txt;
+  el.focus();el.dispatchEvent(new Event('input'));
+}
+function ponerTexto(id,txt){
+  const el=document.getElementById(id);if(!el)return;
+  const v=el.value.trim();
+  el.value=v?v+'\n'+txt:txt;
+  el.focus();
+}
+/* Panel de chips por categorías */
+function panelChips(destino,grupos,etiqueta){
+  const claves=Object.keys(grupos);
+  const uid='ch'+Math.random().toString(36).slice(2,7);
+  const tipo=(grupos===SIGNOS)?'signos':'sintomas';
+  return `<div class="chips-box" id="${uid}" data-tipo="${tipo}">
+    <div class="atajo-lbl">${etiqueta}</div>
+    <div class="chips-tabs">${claves.map((k,i)=>
+      `<button type="button" class="${i===0?'on':''}" onclick="cambiarChips('${uid}','${destino}',${i})">${esc(k)}</button>`).join('')}</div>
+    <div class="chips" id="${uid}-lista">${grupos[claves[0]].map(t=>
+      `<span class="chip" onclick="agregarTexto('${destino}','${esc(t).replace(/'/g,"\\'")}')">${esc(t)}</span>`).join('')}</div>
+  </div>`;
+}
+const _GRUPOS={sintomas:SINTOMAS,signos:SIGNOS};
+function cambiarChips(uid,destino,idx){
+  const box=document.getElementById(uid);if(!box)return;
+  const grupos=box.dataset.tipo==='signos'?SIGNOS:SINTOMAS;
+  const claves=Object.keys(grupos);
+  box.querySelectorAll('.chips-tabs button').forEach((b,i)=>b.classList.toggle('on',i===idx));
+  document.getElementById(uid+'-lista').innerHTML=grupos[claves[idx]].map(t=>
+    `<span class="chip" onclick="agregarTexto('${destino}','${esc(t).replace(/'/g,"\\'")}')">${esc(t)}</span>`).join('');
+}
+/* Plantillas de texto largo (propias ★ primero, luego las base) */
+function panelPlantillas(destino,plantillas,etiqueta){
+  Object.keys(plantillas).forEach(k=>{_PLT[destino+'|'+k]=plantillas[k]});
+  return `<div class="chips-box"><div class="atajo-lbl">${etiqueta}</div>
+    <div class="chips">${Object.keys(plantillas).map(k=>
+      `<span class="chip plantilla" onclick="ponerTexto('${destino}',plantillaTxt('${destino}|${esc(k).replace(/'/g,"\\'")}'))">${esc(k)}</span>`).join('')}</div></div>`;
+}
+/* Autocompletado de medicamentos: rellena dosis y duración */
+function autoMed(input){
+  const fila=input.closest('[data-med-row]');if(!fila)return;
+  const item=todosLosMeds().find(v=>v.m.toLowerCase()===input.value.trim().toLowerCase());
+  const sug=fila.querySelector('.med-sug');
+  if(item){
+    const d=fila.querySelector('.fr-dosis'),u=fila.querySelector('.fr-dur');
+    if(!d.value.trim())d.value=item.d;
+    if(!u.value.trim())u.value=item.u;
+    if(sug)sug.textContent='✓ '+item.g+' — dosis sugerida cargada, ajústala si es necesario';
+  }else if(sug)sug.textContent='';
+}
+/* Autocompletado de diagnóstico: rellena el CIE-10 */
+function autoDx(){
+  const el=document.getElementById('fn-dx');if(!el)return;
+  const item=DIAGNOSTICOS.find(x=>x.d.toLowerCase()===el.value.trim().toLowerCase());
+  const cie=document.getElementById('fn-cie');
+  if(item&&cie&&!cie.value.trim())cie.value=item.c;
+}
+/* Listas para los <datalist> */
+function datalistMeds(){
+  return `<datalist id="dl-meds">${todosLosMeds().map(v=>`<option value="${esc(v.m)}">${esc(v.g)}</option>`).join('')}</datalist>`;
+}
+function datalistDx(){
+  return `<datalist id="dl-dx">${DIAGNOSTICOS.map(v=>`<option value="${esc(v.d)}">${esc(v.c)}</option>`).join('')}</datalist>`;
+}
+
+
+
+/* ---------- Vista: Mis atajos ---------- */
+function vAtajos(){
+  const a=misAtajos();
+  return topbar('Mis atajos','Tus medicamentos, textos y esquemas de tratamiento','')+`
+  <div class="info-strip">⚡ Todo lo que guardes aquí aparece automáticamente en tus recetas y notas de consulta, y se sincroniza con tu cuenta. Es tu forma de trabajar, pre-escrita.</div>
+  <div class="grid grid-2" style="align-items:start">
+    <div class="card"><h3>Mis esquemas de tratamiento <button class="btn sm" onclick="formEsquema()">+ Nuevo</button></h3>
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Un esquema aplica varios medicamentos e indicaciones a la receta de un solo clic. También puedes crearlos desde una receta con "Guardar como esquema".</p>
+      ${a.esquemas.length?a.esquemas.map((e,i)=>`
+        <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,.6)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <b>⚡ ${esc(e.nombre)}</b>
+            <span style="white-space:nowrap"><button class="btn ghost sm" onclick="formEsquema(${i})">Editar</button>
+            <button class="btn ghost sm" onclick="delAtajo('esquemas',${i})">✕</button></span></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">${e.items.map(it=>esc(it.med)).join(' · ')}</div>
+        </div>`).join(''):'<div class="empty" style="padding:18px"><div class="big">⚡</div>Sin esquemas todavía</div>'}
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h3>Mis medicamentos <button class="btn sm" onclick="formMedPropio()">+ Agregar</button></h3>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Fármacos que usas y no están en el vademécum base, con tu dosis habitual. Aparecen primero en el buscador de recetas.</p>
+        ${a.meds.length?`<table><tbody>${a.meds.map((m,i)=>`
+          <tr><td><b>${esc(m.m)}</b><br><span style="font-size:11.5px;color:var(--muted)">${esc(m.d)} — ${esc(m.u)}</span></td>
+          <td style="white-space:nowrap;text-align:right"><button class="btn ghost sm" onclick="formMedPropio(${i})">Editar</button>
+          <button class="btn ghost sm" onclick="delAtajo('meds',${i})">✕</button></td></tr>`).join('')}</tbody></table>`
+        :'<div class="empty" style="padding:18px"><div class="big">💊</div>Sin medicamentos propios</div>'}
+      </div>
+      <div class="card"><h3>Mis plantillas de texto <button class="btn sm" onclick="formPlantillaPropia()">+ Nueva</button></h3>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Textos que repites en motivo, examen o plan. Aparecen con ★ al inicio de las plantillas.</p>
+        ${a.plantillas.length?a.plantillas.map((p,i)=>`
+          <div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,.6)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <span><b>★ ${esc(p.nombre)}</b> <span class="badge blue">${p.campo}</span></span>
+              <span style="white-space:nowrap"><button class="btn ghost sm" onclick="formPlantillaPropia(${i})">Editar</button>
+              <button class="btn ghost sm" onclick="delAtajo('plantillas',${i})">✕</button></span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(p.texto.slice(0,110))}${p.texto.length>110?'…':''}</div>
+          </div>`).join(''):'<div class="empty" style="padding:18px"><div class="big">📝</div>Sin plantillas propias</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+function delAtajo(tipo,i){
+  if(!confirm('¿Eliminar este atajo?'))return;
+  misAtajos()[tipo].splice(i,1);saveDB();render();
+}
+function formMedPropio(i){
+  const m=i!=null?misAtajos().meds[i]:{};
+  openModal(`<h3>${i!=null?'Editar':'Agregar'} medicamento propio</h3>
+  <div class="form-grid">
+    <div class="field full"><label>Medicamento y presentación *</label><input id="mp-m" value="${esc(m.m||'')}" placeholder="Vortioxetina 10 mg tabletas"></div>
+    <div class="field"><label>Dosis / frecuencia habitual</label><input id="mp-d" value="${esc(m.d||'')}" placeholder="1 tableta cada 24 horas"></div>
+    <div class="field"><label>Duración / cantidad habitual</label><input id="mp-u" value="${esc(m.u||'')}" placeholder="por 30 días · #30"></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveMedPropio(${i!=null?i:'null'})">Guardar</button></div>`);
+}
+function saveMedPropio(i){
+  const m={g:'★ Mis medicamentos',m:$('#mp-m').value.trim(),d:$('#mp-d').value.trim(),u:$('#mp-u').value.trim()};
+  if(!m.m){toast('El nombre es obligatorio');return}
+  const a=misAtajos();
+  if(i!=null)a.meds[i]=m;else a.meds.push(m);
+  saveDB();closeModal();toast('Medicamento guardado');render();
+}
+function formPlantillaPropia(i){
+  const p=i!=null?misAtajos().plantillas[i]:{};
+  openModal(`<h3>${i!=null?'Editar':'Nueva'} plantilla de texto</h3>
+  <div class="form-grid">
+    <div class="field"><label>Nombre corto *</label><input id="pp-n" value="${esc(p.nombre||'')}" placeholder="Primera vez psiquiatría"></div>
+    <div class="field"><label>Se usa en</label><select id="pp-c">
+      ${[['motivo','Motivo de consulta'],['examen','Examen / hallazgos'],['plan','Plan de tratamiento']].map(([v,t])=>
+        `<option value="${v}" ${p.campo===v?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="field full"><label>Texto *</label><textarea id="pp-t" rows="7">${esc(p.texto||'')}</textarea>
+      <div class="hint">Puedes dejar espacios con ___ para rellenar en el momento.</div></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="savePlantillaPropia(${i!=null?i:'null'})">Guardar</button></div>`);
+}
+function savePlantillaPropia(i){
+  const p={nombre:$('#pp-n').value.trim(),campo:$('#pp-c').value,texto:$('#pp-t').value.trim()};
+  if(!p.nombre||!p.texto){toast('Nombre y texto son obligatorios');return}
+  const a=misAtajos();
+  if(i!=null)a.plantillas[i]=p;else a.plantillas.push(p);
+  saveDB();closeModal();toast('Plantilla guardada');render();
+}
+function formEsquema(i){
+  const e=i!=null?misAtajos().esquemas[i]:{items:[{}]};
+  openModal(`<h3>${i!=null?'Editar':'Nuevo'} esquema de tratamiento</h3>
+  <div class="field" style="margin-bottom:10px"><label>Nombre del esquema *</label>
+    <input id="eq-n" value="${esc(e.nombre||'')}" placeholder="Depresión — inicio / IVU no complicada / HTA de novo"></div>
+  ${datalistMeds()}
+  <div id="eq-meds">${e.items.map((it,j)=>filaMedHTML(j,{med:it.med,dosis:it.dosis,dur:it.dur})).join('')}</div>
+  <button class="btn secondary sm" onclick="addMedRowEq()">+ Agregar medicamento</button>
+  <div class="field" style="margin-top:12px"><label>Indicaciones generales del esquema</label>
+    <textarea id="eq-i">${esc(e.indicaciones||'')}</textarea></div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveEsquema(${i!=null?i:'null'})">Guardar esquema</button></div>`,true);
+}
+function addMedRowEq(){const box=document.getElementById('eq-meds');
+  box.insertAdjacentHTML('beforeend',filaMedHTML(box.querySelectorAll('[data-med-row]').length))}
+function saveEsquema(i){
+  const nombre=$('#eq-n').value.trim();
+  if(!nombre){toast('El nombre es obligatorio');return}
+  const items=[...document.querySelectorAll('#eq-meds [data-med-row]')].map(r=>({
+    med:r.querySelector('.fr-med').value.trim(),dosis:r.querySelector('.fr-dosis').value.trim(),dur:r.querySelector('.fr-dur').value.trim()
+  })).filter(x=>x.med);
+  if(!items.length){toast('Agrega al menos un medicamento');return}
+  const e={nombre,items,indicaciones:$('#eq-i').value.trim()};
+  const a=misAtajos();
+  if(i!=null)a.esquemas[i]=e;else a.esquemas.push(e);
+  logAction('Esquema personal guardado: '+nombre);
+  saveDB();closeModal();toast('Esquema guardado');render();
+}
+
+/* ---------- Render principal ---------- */
+const VIEWS={dashboard:vDashboard,pacientes:vPacientes,'pacientes-detalle':vPacienteDetalle,
+  agenda:vAgenda,consultas:vConsultas,recetas:vRecetas,certificados:vCertificados,
+  facturacion:vFacturacion,reportes:vReportes,config:vConfig,admin:vAdmin,atajos:vAtajos};
+function render(){
+  renderNav();
+  const v=VIEWS[route.view]||vDashboard;
+  $('#main').innerHTML=v();
+  window.scrollTo(0,0);
+  if(route.view==='admin')cargarAdmin();
+}
+(async function init(){
+  if(SUPABASE_URL.includes('TU-PROYECTO')){
+    document.querySelector('.auth-card').innerHTML='<h1>Med<span>Consulta</span></h1>'+
+      '<div class="sub">Falta configurar la conexión</div>'+
+      '<div class="auth-msg err" style="display:block">Abre este archivo con un editor de texto y reemplaza SUPABASE_URL y SUPABASE_ANON_KEY con los datos de tu proyecto (líneas al inicio del script). Están en Supabase → Settings → API.</div>';
+    return;
+  }
+  if(!window.supabase){
+    document.querySelector('.auth-card').innerHTML='<h1>Med<span>Consulta</span></h1>'+
+      '<div class="sub">Problema de conexión</div>'+
+      '<div class="auth-msg err" style="display:block">No se pudo cargar el componente de conexión. Revisa tu internet y recarga la página.</div>'+
+      '<button class="btn" onclick="location.reload()">Reintentar</button>';
+    return;
+  }
+  SB=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  const {data:{session}}=await SB.auth.getSession();
+  if(session)await entrar();
+})();
+</script>
+<script>
+/* Onda expansiva en cada clic */
+document.addEventListener('click',function(e){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const r=document.createElement('span');
+  r.className='ripple';r.style.left=e.clientX+'px';r.style.top=e.clientY+'px';
+  document.body.appendChild(r);
+  setTimeout(()=>r.remove(),600);
+},true);
+</script>
+<script>
+/* Barra de progreso de lectura */
+(function(){
+  const bar=document.getElementById('scroll-progress');
+  function upd(){
+    const h=document.documentElement;
+    const max=h.scrollHeight-h.clientHeight;
+    bar.style.width=(max>0?(h.scrollTop/max*100):0)+'%';
+  }
+  window.addEventListener('scroll',upd,{passive:true});
+  window.addEventListener('resize',upd);
+})();
+
+/* Contadores de KPIs que suben al aparecer */
+function animarKPIs(){
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  document.querySelectorAll('.kpi .num').forEach(el=>{
+    const txt=el.textContent;
+    // Solo animar si es numérico puro o moneda (evita fechas y '—')
+    const m=txt.match(/^([^0-9]*)([0-9][0-9.,]*)(.*)$/);
+    if(!m)return;
+    const fin=parseFloat(m[2].replace(/,/g,''));
+    if(!isFinite(fin)||fin===0)return;
+    const pre=m[1],post=m[3];
+    const dec=/\.\d\d$/.test(m[2])?2:0;
+    const dur=700,t0=performance.now();
+    function paso(t){
+      const p=Math.min((t-t0)/dur,1);
+      const e=1-Math.pow(1-p,3); // ease-out
+      el.textContent=pre+(fin*e).toLocaleString('es-DO',{minimumFractionDigits:dec,maximumFractionDigits:dec})+post;
+      if(p<1)requestAnimationFrame(paso);else el.textContent=txt;
+    }
+    requestAnimationFrame(paso);
+  });
+}
+
+/* Enganchar la transición de vista y los contadores al render existente */
+if(typeof render==='function'){
+  const renderOriginal=render;
+  render=function(){
+    renderOriginal();
+    const m=document.getElementById('main');
+    if(m){m.classList.remove('view-enter');void m.offsetWidth;m.classList.add('view-enter')}
+    animarKPIs();
+  };
+}
+</script>
+</body>
+</html>
