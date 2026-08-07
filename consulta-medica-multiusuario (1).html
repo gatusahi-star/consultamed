@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedConsulta · Sistema de Gestión de Consulta Médica (Multiusuario)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#16302B; --ink2:#254740; --paper:#F5F4EF; --card:#FFFFFF;
+  --accent:#0E7C66; --accent-soft:#E3F1ED; --amber:#B7791F; --amber-soft:#FBF3E4;
+  --red:#B3423A; --red-soft:#FBEAE8; --blue:#2A5B8C; --blue-soft:#E8F0F8;
+  --line:#E2E0D8; --muted:#6E7A76; --radius:10px;
+  --font-display:'Sora',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ===== Layout ===== */
+#app{display:flex;min-height:100vh}
+.sidebar{width:225px;background:var(--ink);color:#DCE6E2;padding:20px 0;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.logo{padding:0 20px 18px;border-bottom:1px solid rgba(255,255,255,.09);margin-bottom:12px}
+.logo h1{font-family:var(--font-display);font-size:19px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.logo h1 span{color:#7FC7B5}
+.logo p{font-size:11px;color:#8FA39D;margin-top:2px}
+.nav{flex:1;overflow-y:auto}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:#B9C9C4;padding:10px 20px;font-size:13.5px;text-align:left;border-left:3px solid transparent;transition:.15s}
+.nav button:hover{background:rgba(255,255,255,.05);color:#fff}
+.nav button.active{background:rgba(127,199,181,.12);color:#fff;border-left-color:#7FC7B5;font-weight:600}
+.nav .icon{width:18px;text-align:center;font-size:15px}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:#5E736D;padding:14px 20px 6px}
+.sidebar-footer{padding:14px 20px 0;border-top:1px solid rgba(255,255,255,.09);font-size:11px;color:#8FA39D}
+
+.main{flex:1;padding:26px 32px;max-width:1200px;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.topbar h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.4px}
+.topbar .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.search-global{position:relative}
+.search-global input{padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:8px;width:250px;background:var(--card)}
+.search-global::before{content:'🔍';position:absolute;left:10px;top:8px;font-size:13px;opacity:.5}
+.search-results{position:absolute;top:42px;left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow-y:auto}
+.search-results div{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.search-results div:hover{background:var(--accent-soft)}
+
+/* ===== Components ===== */
+.grid{display:grid;gap:16px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.card h3{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.kpi .num{font-family:var(--font-display);font-size:28px;font-weight:700;letter-spacing:-.5px}
+.kpi .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi .delta{font-size:11.5px;margin-top:6px}
+.delta.up{color:var(--accent)} .delta.down{color:var(--red)} .delta.warn{color:var(--amber)}
+
+.btn{background:var(--accent);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:600;transition:.15s}
+.btn:hover{background:#0A6553}
+.btn.secondary{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn.danger{background:var(--red)} .btn.danger:hover{background:#93332C}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:6px}
+.btn.ghost{background:none;color:var(--accent);border:none;padding:4px 8px}
+
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.green{background:var(--accent-soft);color:var(--accent)}
+.badge.amber{background:var(--amber-soft);color:var(--amber)}
+.badge.red{background:var(--red-soft);color:var(--red)}
+.badge.blue{background:var(--blue-soft);color:var(--blue)}
+.badge.gray{background:#EEEDE7;color:var(--muted)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:8px 10px;border-bottom:2px solid var(--line);font-weight:600}
+td{padding:10px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle}
+tr:hover td{background:#FAFAF6}
+tr.clickable{cursor:pointer}
+
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.form-grid .full{grid-column:1/-1}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.field textarea{resize:vertical;min-height:70px}
+.field .hint{font-size:11px;color:var(--muted);margin-top:3px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(22,48,43,.45);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.modal{background:var(--card);border-radius:14px;width:100%;max-width:720px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal.wide{max-width:900px}
+.modal h3{font-family:var(--font-display);font-size:17px;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
+.tabs button{background:none;border:none;padding:9px 15px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500}
+.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+.alert-strip{background:var(--red-soft);border:1px solid #EDCBC7;color:var(--red);padding:9px 14px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:14px}
+.info-strip{background:var(--blue-soft);border:1px solid #CCDCEC;color:var(--blue);padding:9px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+
+/* Ficha de paciente: banda tipo expediente clínico */
+.chart-band{background:var(--ink);color:#fff;border-radius:var(--radius);padding:20px 22px;margin-bottom:18px;display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.chart-band .avatar{width:56px;height:56px;border-radius:50%;background:#7FC7B5;color:var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:21px;font-weight:700;flex-shrink:0}
+.chart-band h2{font-family:var(--font-display);font-size:20px;letter-spacing:-.3px}
+.chart-band .meta{font-size:12.5px;color:#A9BEB8;margin-top:3px}
+.chart-band .vitals{display:flex;gap:22px;margin-left:auto;flex-wrap:wrap}
+.chart-band .vital .v{font-family:var(--font-display);font-size:16px;font-weight:600}
+.chart-band .vital .k{font-size:10.5px;color:#8FA39D;text-transform:uppercase;letter-spacing:.8px}
+
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:'';position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-item{position:relative;padding-bottom:16px}
+.tl-item::before{content:'';position:absolute;left:-20px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid #fff}
+.tl-item .tl-date{font-size:11.5px;color:var(--muted);font-weight:600}
+.tl-item .tl-body{background:#FAFAF6;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin-top:5px;font-size:13px}
+
+.bars{display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:10px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.bar-col .bar{width:100%;max-width:44px;background:var(--accent);border-radius:5px 5px 0 0;transition:.3s;min-height:2px}
+.bar-col .bl{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bar-col .bv{font-size:11px;font-weight:600}
+
+.empty{text-align:center;padding:36px 16px;color:var(--muted)}
+.empty .big{font-size:34px;margin-bottom:8px;opacity:.5}
+.toast{position:fixed;bottom:22px;right:22px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:slideup .25s}
+@keyframes slideup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.scale-grid{display:grid;grid-template-columns:1fr repeat(4,58px);gap:4px;align-items:center;font-size:12.5px}
+.scale-grid .sq{font-size:12.5px}
+.scale-grid label{text-align:center;font-size:11px;cursor:pointer;padding:5px 2px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.scale-grid input{display:none}
+.scale-grid input:checked+span{display:block;background:var(--accent);color:#fff;border-radius:5px;margin:-5px -2px;padding:5px 2px}
+.score-pill{font-family:var(--font-display);font-weight:700;font-size:16px}
+
+/* ===== Impresión ===== */
+
+/* ===== Pantalla de acceso ===== */
+#auth-screen{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px}
+.auth-card{background:var(--card);border-radius:16px;padding:32px;width:100%;max-width:420px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
+.auth-card h1{font-family:var(--font-display);font-size:24px;letter-spacing:-.4px;margin-bottom:2px}
+.auth-card h1 span{color:var(--accent)}
+.auth-card .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.auth-card .field{margin-bottom:12px}
+.auth-msg{font-size:13px;padding:9px 12px;border-radius:8px;margin-bottom:12px;display:none}
+.auth-msg.err{display:block;background:var(--red-soft);color:var(--red)}
+.auth-msg.ok{display:block;background:var(--accent-soft);color:var(--accent)}
+#app{display:none}
+#app.autenticado{display:flex}
+.sync-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7FC7B5;margin-right:6px}
+.sync-dot.saving{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+#print-area{display:none}
+@media print{
+  #app,.toast,.modal-bg{display:none!important}
+  #print-area{display:block!important;font-family:Georgia,serif;color:#000}
+  .doc{max-width:680px;margin:0 auto;padding:10px}
+  .doc-head{border-bottom:2.5px solid #16302B;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-end}
+  .doc-head h1{font-size:20px;font-family:'Sora',sans-serif;color:#16302B}
+  .doc-head .cred{font-size:12px;color:#333;margin-top:3px;line-height:1.5}
+  .doc-head .rx{font-size:44px;font-family:Georgia,serif;color:#16302B}
+  .doc-title{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin:14px 0;text-align:center}
+  .doc-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+  .doc-body{font-size:14px;line-height:1.8;margin:18px 0;min-height:200px}
+  .doc-body ol{padding-left:22px}
+  .doc-body li{margin-bottom:12px}
+  .doc-sign{margin-top:70px;text-align:center}
+  .doc-sign .line{border-top:1.5px solid #000;width:260px;margin:0 auto;padding-top:6px;font-size:13px}
+  .doc-foot{margin-top:26px;border-top:1px solid #999;padding-top:8px;font-size:11px;color:#555;text-align:center}
+  .doc table{width:100%;border-collapse:collapse;font-size:13px}
+  .doc td,.doc th{border:1px solid #999;padding:6px 9px}
+}
+@media(max-width:960px){
+  .grid-4,.grid-3{grid-template-columns:repeat(2,1fr)}
+  .sidebar{width:64px}
+  .sidebar .logo h1,.sidebar .logo p,.nav .txt,.nav-section,.sidebar-footer{display:none}
+  .nav button{justify-content:center;padding:12px 0}
+  .main{padding:18px 14px}
+}
+@media(max-width:640px){.grid-4,.grid-3,.grid-2,.form-grid{grid-template-columns:1fr}.chart-band .vitals{margin-left:0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Med<span>Consulta</span></h1>
+    <div class="sub">Sistema de gestión de consulta médica</div>
+    <div class="tabs" style="margin-bottom:16px">
+      <button id="auth-tab-login" class="active" onclick="authTab('login')">Iniciar sesión</button>
+      <button id="auth-tab-reg" onclick="authTab('reg')">Crear cuenta</button>
+    </div>
+    <div class="auth-msg" id="auth-msg"></div>
+    <div id="auth-reg-extra" style="display:none">
+      <div class="field"><label>Nombre completo</label><input id="au-nombre" placeholder="Dra. Nombre Apellido"></div>
+      <div class="field"><label>Tipo de cuenta</label>
+        <select id="au-rol" onchange="document.getElementById('au-medcod-box').style.display=this.value==='secretaria'?'block':'none'">
+          <option value="medico">Médico(a)</option>
+          <option value="secretaria">Secretaria / asistente</option>
+        </select></div>
+      <div class="field" id="au-medcod-box" style="display:none">
+        <label>Código del médico</label><input id="au-medcod" placeholder="Pídele su código de vinculación">
+        <div class="hint">El médico lo encuentra en Configuración → Equipo.</div></div>
+    </div>
+    <div class="field"><label>Correo electrónico</label><input type="email" id="au-email" autocomplete="username"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="au-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')authGo()"></div>
+    <button class="btn" id="auth-btn" style="width:100%;padding:11px" onclick="authGo()">Entrar</button>
+  </div>
+</div>
+<div id="app">
+  <aside class="sidebar">
+    <div class="logo"><h1>Med<span>Consulta</span></h1><p>Gestión clínica integral</p></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-footer" id="side-foot"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div id="print-area"></div>
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<script>
+/* =====================================================
+   MedConsulta — Sistema de gestión de consulta médica
+   Módulos: dashboard, pacientes, agenda, consultas,
+   recetas, certificados, facturación, reportes, config
+===================================================== */
+'use strict';
+
+/* ---------- Conexión a Supabase (EDITA ESTAS 2 LÍNEAS) ---------- */
+const SUPABASE_URL='https://jdyhnwenxqxtktjpwboq.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_Te2Aj938fyF0kzHlR6t4-A_K6vHFCfx';
+
+let SB=null, SESION=null; // SESION = {userId, email, rol, nombre, medicoId}
+const TABLAS=['pacientes','citas','consultas','recetas','certificados','facturas'];
+
+let DB={
+  config:{medico:'Dra. Nombre Apellido',especialidad:'Medicina General',exequatur:'000-00',cmd:'',
+    consultorio:'Centro Médico',direccion:'Calle Principal #1, Ciudad',telefono:'809-000-0000',
+    email:'',precioConsulta:2000,moneda:'RD$'},
+  pacientes:[],citas:[],consultas:[],recetas:[],certificados:[],facturas:[],log:[]
+};
+let SHADOW={config:'{}'};
+const esMedico=()=>!SESION||SESION.rol==='medico';
+
+/* ---------- Autenticación ---------- */
+let authMode='login';
+function authTab(m){authMode=m;
+  document.getElementById('auth-tab-login').classList.toggle('active',m==='login');
+  document.getElementById('auth-tab-reg').classList.toggle('active',m==='reg');
+  document.getElementById('auth-reg-extra').style.display=m==='reg'?'block':'none';
+  document.getElementById('auth-btn').textContent=m==='reg'?'Crear cuenta':'Entrar';
+  authMsg('');
+}
+function authMsg(txt,ok){const m=document.getElementById('auth-msg');
+  m.textContent=txt;m.className='auth-msg'+(txt?(ok?' ok':' err'):'')}
+async function authGo(){
+  const email=document.getElementById('au-email').value.trim();
+  const pass=document.getElementById('au-pass').value;
+  if(!email||!pass){authMsg('Correo y contraseña son obligatorios');return}
+  const btn=document.getElementById('auth-btn');btn.disabled=true;btn.textContent='Un momento…';
+  try{
+    if(authMode==='reg'){
+      const nombre=document.getElementById('au-nombre').value.trim();
+      const rol=document.getElementById('au-rol').value;
+      const medcod=document.getElementById('au-medcod').value.trim();
+      if(!nombre){authMsg('Escribe tu nombre');return}
+      if(rol==='secretaria'&&!medcod){authMsg('Necesitas el código del médico para vincularte');return}
+      const {error}=await SB.auth.signUp({email,password:pass,
+        options:{data:{nombre,rol,medico_id:rol==='secretaria'?medcod:''}}});
+      if(error)throw error;
+      authMsg('Cuenta creada. Si tu proyecto pide confirmación por correo, revisa tu bandeja; si no, ya puedes iniciar sesión.',true);
+      authTab('login');
+    }else{
+      const {error}=await SB.auth.signInWithPassword({email,password:pass});
+      if(error)throw error;
+      await entrar();
+    }
+  }catch(e){
+    const m=String(e.message||e);
+    authMsg(m.includes('Invalid login')?'Correo o contraseña incorrectos':
+            m.includes('already registered')?'Ese correo ya tiene cuenta — inicia sesión':
+            'Error: '+m);
+  }finally{btn.disabled=false;btn.textContent=authMode==='reg'?'Crear cuenta':'Entrar'}
+}
+async function entrar(){
+  const {data:{user}}=await SB.auth.getUser();
+  if(!user)return;
+  const {data:perfil,error}=await SB.from('perfiles').select('*').eq('id',user.id).single();
+  if(error||!perfil){authMsg('No se encontró tu perfil. Verifica que ejecutaste el esquema SQL.');await SB.auth.signOut();return}
+  SESION={userId:user.id,email:user.email,rol:perfil.rol,nombre:perfil.nombre,medicoId:perfil.medico_id};
+  if(perfil.config&&Object.keys(perfil.config).length)DB.config=Object.assign({},DB.config,perfil.config);
+  await cargarDatos();
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').classList.add('autenticado');
+  render();
+}
+async function salir(){await SB.auth.signOut();location.reload()}
+
+/* ---------- Carga y sincronización con la nube ---------- */
+async function cargarDatos(){
+  for(const t of TABLAS){
+    try{
+      const {data,error}=await SB.from(t).select('id,data');
+      if(error){DB[t]=[];SHADOW[t]={};continue}  // secretarias: consultas denegadas por RLS
+      DB[t]=(data||[]).map(r=>r.data);
+      SHADOW[t]={};(data||[]).forEach(r=>SHADOW[t][r.id]=JSON.stringify(r.data));
+    }catch(e){DB[t]=[];SHADOW[t]={}}
+  }
+  SHADOW.config=JSON.stringify(DB.config);
+  try{
+    const {data:logs}=await SB.from('auditoria').select('t,txt').order('t',{ascending:false}).limit(100);
+    DB.log=logs||[];
+  }catch(e){DB.log=[]}
+}
+let saveTimer=null;
+function saveDB(){
+  clearTimeout(saveTimer);
+  setSync(true);
+  saveTimer=setTimeout(syncAll,400);
+}
+async function syncAll(){
+  if(!SB||!SESION)return;
+  try{
+    for(const t of TABLAS){
+      if(t==='consultas'&&!esMedico())continue;
+      const actuales={};DB[t].forEach(o=>actuales[o.id]=o);
+      const previos=SHADOW[t]||{};
+      const upserts=[];
+      for(const id in actuales){
+        const j=JSON.stringify(actuales[id]);
+        if(previos[id]!==j)upserts.push({id,data:actuales[id]});
+      }
+      const borrar=Object.keys(previos).filter(id=>!actuales[id]);
+      if(upserts.length){
+        const {error}=await SB.from(t).upsert(upserts.map(u=>({id:u.id,data:u.data,actualizado:new Date().toISOString()})));
+        if(error)throw error;
+      }
+      if(borrar.length){
+        const {error}=await SB.from(t).delete().in('id',borrar);
+        if(error)throw error;
+      }
+      SHADOW[t]={};DB[t].forEach(o=>SHADOW[t][o.id]=JSON.stringify(o));
+    }
+    const cj=JSON.stringify(DB.config);
+    if(SHADOW.config!==cj){
+      await SB.from('perfiles').update({config:DB.config}).eq('id',SESION.userId);
+      SHADOW.config=cj;
+    }
+    setSync(false);
+  }catch(e){
+    console.error('Error de sincronización',e);
+    setSync(false);
+    toast('⚠ No se pudo guardar en la nube. Revisa tu conexión.');
+  }
+}
+function setSync(saving){
+  const d=document.getElementById('sync-dot');
+  if(d)d.className='sync-dot'+(saving?' saving':'');
+}
+function logAction(txt){
+  DB.log.unshift({t:new Date().toISOString(),txt:txt+' ('+((SESION&&SESION.nombre)||'')+')'});
+  if(DB.log.length>300)DB.log.length=300;
+  if(SB&&SESION)SB.from('auditoria').insert({txt}).then(()=>{});
+  saveDB();
+}
+
+/* ---------- Utilidades ---------- */
+const $=s=>document.querySelector(s);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtMoney=n=>DB.config.moneda+' '+Number(n||0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const hoyISO=()=>new Date().toISOString().slice(0,10);
+function fmtFecha(iso,conHora){
+  if(!iso)return'—';
+  const d=new Date(iso.length===10?iso+'T12:00:00':iso);
+  const f=d.toLocaleDateString('es-DO',{day:'numeric',month:'short',year:'numeric'});
+  return conHora?f+' · '+d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'}):f;
+}
+function edad(fnac){if(!fnac)return null;const d=new Date(fnac),h=new Date();let e=h.getFullYear()-d.getFullYear();if(h.getMonth()<d.getMonth()||(h.getMonth()===d.getMonth()&&h.getDate()<d.getDate()))e--;return e}
+function iniciales(n){return n.split(' ').filter(Boolean).slice(0,2).map(p=>p[0].toUpperCase()).join('')}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;$('#toast-root').appendChild(t);setTimeout(()=>t.remove(),2600)}
+function pacienteDe(id){return DB.pacientes.find(p=>p.id===id)}
+function nombrePac(id){const p=pacienteDe(id);return p?p.nombre:'(paciente eliminado)'}
+function telLimpio(t){return String(t||'').replace(/\D/g,'')}
+
+/* ---------- Modal ---------- */
+function openModal(html,wide){
+  const bg=document.createElement('div');bg.className='modal-bg';
+  bg.innerHTML=`<div class="modal${wide?' wide':''}" role="dialog">${html}</div>`;
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove()});
+  $('#modal-root').appendChild(bg);
+  const f=bg.querySelector('input,select,textarea');if(f)f.focus();
+  return bg;
+}
+function closeModal(){const m=$('#modal-root .modal-bg');if(m)m.remove()}
+
+/* ---------- Impresión ---------- */
+function imprimirDoc(html){$('#print-area').innerHTML=html;setTimeout(()=>window.print(),80)}
+function docHeader(){
+  const c=DB.config;
+  return `<div class="doc-head">
+    <div><h1>${esc(c.medico)}</h1>
+    <div class="cred">${esc(c.especialidad)}${c.exequatur?' · Exequátur '+esc(c.exequatur):''}${c.cmd?' · CMD '+esc(c.cmd):''}<br>
+    ${esc(c.consultorio)} · ${esc(c.direccion)}<br>Tel. ${esc(c.telefono)}${c.email?' · '+esc(c.email):''}</div></div>
+    <div class="rx">℞</div></div>`;
+}
+function docFooter(){return `<div class="doc-foot">Documento generado por MedConsulta · ${fmtFecha(hoyISO())} · Este documento es válido con firma y sello del médico.</div>`}
+
+/* ---------- Router ---------- */
+let route={view:'dashboard',params:{}};
+function go(view,params){route={view,params:params||{}};render()}
+
+const NAV=[
+  {sec:'Clínica'},
+  {id:'dashboard',icon:'▦',txt:'Panel principal'},
+  {id:'agenda',icon:'📅',txt:'Agenda'},
+  {id:'pacientes',icon:'👤',txt:'Pacientes'},
+  {id:'consultas',icon:'🩺',txt:'Consultas'},
+  {sec:'Documentos'},
+  {id:'recetas',icon:'℞',txt:'Recetas'},
+  {id:'certificados',icon:'📄',txt:'Certificados'},
+  {sec:'Administración'},
+  {id:'facturacion',icon:'💵',txt:'Facturación'},
+  {id:'reportes',icon:'📊',txt:'Reportes'},
+  {id:'config',icon:'⚙',txt:'Configuración'},
+];
+function renderNav(){
+  const items=NAV.filter(n=>esMedico()||!['consultas','recetas','certificados'].includes(n.id));
+  $('#nav').innerHTML=items.map(n=>n.sec
+    ?`<div class="nav-section">${n.sec}</div>`
+    :`<button class="${route.view===n.id||route.view.startsWith(n.id+'-')?'active':''}" onclick="go('${n.id}')">
+        <span class="icon">${n.icon}</span><span class="txt">${n.txt}</span></button>`).join('');
+  $('#side-foot').innerHTML=`<span class="sync-dot" id="sync-dot"></span>${esc((SESION&&SESION.nombre)||DB.config.medico)}<br>
+    <span style="opacity:.8">${SESION?(SESION.rol==='medico'?'Médico(a)':'Secretaria'):''}</span>
+    <br><button class="btn ghost sm" style="color:#7FC7B5;padding:4px 0" onclick="salir()">Cerrar sesión</button>`;
+}
+
+/* ---------- Búsqueda global ---------- */
+function topbar(titulo,sub,acciones){
+  return `<div class="topbar">
+    <div><h2>${titulo}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-global"><input id="gsearch" placeholder="Buscar paciente (nombre, cédula, tel.)" oninput="gSearch(this.value)" autocomplete="off"><div id="gsearch-res"></div></div>
+      ${acciones||''}
+    </div></div>`;
+}
+function gSearch(q){
+  const box=$('#gsearch-res');
+  q=q.trim().toLowerCase();
+  if(q.length<2){box.innerHTML='';return}
+  const res=DB.pacientes.filter(p=>
+    p.nombre.toLowerCase().includes(q)||String(p.cedula||'').includes(q)||telLimpio(p.telefono).includes(q.replace(/\D/g,'')||'###')
+  ).slice(0,8);
+  box.innerHTML=res.length?`<div class="search-results">${res.map(p=>
+    `<div onclick="go('pacientes-detalle',{id:'${p.id}'})"><b>${esc(p.nombre)}</b><br><span style="font-size:12px;color:var(--muted)">${esc(p.cedula||'sin cédula')} · ${esc(p.telefono||'')}</span></div>`).join('')}</div>`
+    :`<div class="search-results"><div style="color:var(--muted)">Sin resultados</div></div>`;
+}
+
+/* =====================================================
+   DASHBOARD
+===================================================== */
+function vDashboard(){
+  const hoy=hoyISO();
+  const citasHoy=DB.citas.filter(c=>c.fecha===hoy&&c.estado!=='cancelada').sort((a,b)=>a.hora.localeCompare(b.hora));
+  const mesAct=hoy.slice(0,7);
+  const ingresosMes=DB.facturas.filter(f=>f.fecha.slice(0,7)===mesAct&&f.estado==='pagada').reduce((s,f)=>s+Number(f.monto),0);
+  const pendientes=DB.facturas.filter(f=>f.estado==='pendiente');
+  const montoPend=pendientes.reduce((s,f)=>s+Number(f.monto),0);
+  const pacMes=DB.pacientes.filter(p=>(p.creado||'').slice(0,7)===mesAct).length;
+  const citasPasadas=DB.citas.filter(c=>c.fecha<hoy||(c.fecha===hoy&&['completada','ausente'].includes(c.estado)));
+  const ausencias=citasPasadas.filter(c=>c.estado==='ausente').length;
+  const tasaAus=citasPasadas.length?Math.round(ausencias/citasPasadas.length*100):0;
+  // Alertas: pacientes sin consulta en 90+ días con condición crónica marcada por seguimiento
+  const alertas=[];
+  if(pendientes.length)alertas.push(`💵 ${pendientes.length} factura(s) pendiente(s) de cobro por ${fmtMoney(montoPend)}`);
+  const sinConfirmar=citasHoy.filter(c=>c.estado==='programada').length;
+  if(sinConfirmar)alertas.push(`📅 ${sinConfirmar} cita(s) de hoy sin confirmar — envía recordatorio`);
+  DB.pacientes.forEach(p=>{
+    if(!p.seguimiento)return;
+    const ult=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    if(!ult)return;
+    const dias=Math.floor((new Date(hoy)-new Date(ult.fecha))/86400000);
+    if(dias>90)alertas.push(`🔔 ${esc(p.nombre)} (en seguimiento) lleva ${dias} días sin consulta`);
+  });
+
+  return topbar('Panel principal',fmtFecha(hoy)+' · Resumen de la consulta',
+    `<button class="btn" onclick="formCita()">+ Nueva cita</button>`)+`
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="card kpi"><div class="num">${citasHoy.length}</div><div class="lbl">Citas de hoy</div>
+      <div class="delta ${sinConfirmar?'warn':'up'}">${sinConfirmar?sinConfirmar+' sin confirmar':'todas confirmadas'}</div></div>
+    <div class="card kpi"><div class="num">${fmtMoney(ingresosMes)}</div><div class="lbl">Ingresos del mes (cobrados)</div>
+      <div class="delta ${montoPend?'warn':'up'}">${montoPend?fmtMoney(montoPend)+' por cobrar':'sin cuentas pendientes'}</div></div>
+    <div class="card kpi"><div class="num">${DB.pacientes.length}</div><div class="lbl">Pacientes activos</div>
+      <div class="delta up">+${pacMes} este mes</div></div>
+    <div class="card kpi"><div class="num">${tasaAus}%</div><div class="lbl">Tasa de ausentismo</div>
+      <div class="delta ${tasaAus>20?'down':'up'}">${tasaAus>20?'alto — refuerza recordatorios':'bajo control'}</div></div>
+  </div>
+  ${alertas.length?`<div class="card" style="margin-bottom:16px;border-left:4px solid var(--amber)">
+    <h3>Alertas</h3>${alertas.map(a=>`<div style="padding:5px 0;font-size:13.5px">${a}</div>`).join('')}</div>`:''}
+  <div class="grid grid-2">
+    <div class="card"><h3>Agenda de hoy <button class="btn ghost sm" onclick="go('agenda')">Ver agenda →</button></h3>
+      ${citasHoy.length?`<table><thead><tr><th>Hora</th><th>Paciente</th><th>Motivo</th><th>Estado</th></tr></thead><tbody>
+      ${citasHoy.map(c=>`<tr class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})">
+        <td><b>${c.hora}</b></td><td>${esc(nombrePac(c.pacienteId))}</td><td>${esc(c.motivo||'')}</td>
+        <td>${badgeCita(c.estado)}</td></tr>`).join('')}</tbody></table>`
+      :`<div class="empty"><div class="big">📅</div>No hay citas programadas para hoy</div>`}
+    </div>
+    <div class="card"><h3>Actividad reciente</h3>
+      ${DB.log.length?DB.log.slice(0,8).map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <span style="color:var(--muted)">${fmtFecha(l.t,true)}</span> — ${esc(l.txt)}</div>`).join('')
+      :`<div class="empty"><div class="big">📋</div>Aún no hay actividad registrada</div>`}
+    </div>
+  </div>`;
+}
+function badgeCita(e){
+  const m={programada:['gray','Programada'],confirmada:['blue','Confirmada'],completada:['green','Completada'],ausente:['red','Ausente'],cancelada:['amber','Cancelada']};
+  const[cl,tx]=m[e]||['gray',e];return `<span class="badge ${cl}">${tx}</span>`;
+}
+
+/* =====================================================
+   PACIENTES
+===================================================== */
+function vPacientes(){
+  const lista=[...DB.pacientes].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  return topbar('Pacientes',lista.length+' expediente(s)',
+    `<button class="btn" onclick="formPaciente()">+ Nuevo paciente</button>`)+`
+  <div class="card">
+    ${lista.length?`<table><thead><tr><th>Paciente</th><th>Edad</th><th>Teléfono</th><th>ARS</th><th>Alergias</th><th>Última consulta</th><th></th></tr></thead><tbody>
+    ${lista.map(p=>{
+      const ult=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+      return `<tr class="clickable" onclick="go('pacientes-detalle',{id:'${p.id}'})">
+        <td><b>${esc(p.nombre)}</b><br><span style="font-size:11.5px;color:var(--muted)">${esc(p.cedula||'sin cédula')}</span></td>
+        <td>${edad(p.fnac)??'—'}</td><td>${esc(p.telefono||'—')}</td><td>${esc(p.ars||'Privado')}</td>
+        <td>${p.alergias?`<span class="badge red">⚠ ${esc(p.alergias)}</span>`:'<span class="badge gray">Ninguna</span>'}</td>
+        <td>${ult?fmtFecha(ult.fecha):'—'}</td>
+        <td><button class="btn secondary sm" onclick="event.stopPropagation();formPaciente('${p.id}')">Editar</button></td></tr>`;
+    }).join('')}</tbody></table>`
+    :`<div class="empty"><div class="big">👤</div>No hay pacientes registrados todavía.<br><br>
+      <button class="btn" onclick="formPaciente()">Registrar el primero</button>
+      &nbsp;<button class="btn secondary" onclick="seedDemo()">Cargar datos de ejemplo</button></div>`}
+  </div>`;
+}
+
+function formPaciente(id){
+  const p=id?pacienteDe(id):{};
+  openModal(`<h3>${id?'Editar paciente':'Nuevo paciente'}</h3>
+  <div class="form-grid">
+    <div class="field full"><label>Nombre completo *</label><input id="fp-nombre" value="${esc(p.nombre||'')}"></div>
+    <div class="field"><label>Cédula</label><input id="fp-cedula" value="${esc(p.cedula||'')}" placeholder="000-0000000-0"></div>
+    <div class="field"><label>Fecha de nacimiento</label><input type="date" id="fp-fnac" value="${p.fnac||''}"></div>
+    <div class="field"><label>Sexo</label><select id="fp-sexo">
+      ${['','Femenino','Masculino'].map(s=>`<option ${p.sexo===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>Teléfono (WhatsApp)</label><input id="fp-tel" value="${esc(p.telefono||'')}" placeholder="809-000-0000"></div>
+    <div class="field"><label>Correo</label><input id="fp-email" value="${esc(p.email||'')}"></div>
+    <div class="field"><label>ARS / Seguro</label><input id="fp-ars" value="${esc(p.ars||'')}" placeholder="SeNaSa, Humano, Universal… (vacío = privado)"></div>
+    <div class="field full"><label>Dirección</label><input id="fp-dir" value="${esc(p.direccion||'')}"></div>
+    <div class="field full"><label>⚠ Alergias</label><input id="fp-alergias" value="${esc(p.alergias||'')}" placeholder="Penicilina, sulfas, AINEs…">
+      <div class="hint">Se mostrará como alerta en el expediente y al crear recetas.</div></div>
+    <div class="field full"><label>Antecedentes personales</label><textarea id="fp-antp">${esc(p.antPersonales||'')}</textarea></div>
+    <div class="field full"><label>Antecedentes familiares</label><textarea id="fp-antf">${esc(p.antFamiliares||'')}</textarea></div>
+    <div class="field full"><label>Medicamentos actuales</label><textarea id="fp-meds">${esc(p.medsActuales||'')}</textarea></div>
+    <div class="field full"><label><input type="checkbox" id="fp-seg" ${p.seguimiento?'checked':''} style="width:auto;margin-right:6px">Paciente crónico / en seguimiento (alertar si pasa 90 días sin consulta)</label></div>
+  </div>
+  <div class="modal-actions">
+    ${id?`<button class="btn danger" style="margin-right:auto" onclick="delPaciente('${id}')">Eliminar</button>`:''}
+    <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="savePaciente('${id||''}')">Guardar</button></div>`);
+}
+function savePaciente(id){
+  const nombre=$('#fp-nombre').value.trim();
+  if(!nombre){toast('El nombre es obligatorio');return}
+  const data={nombre,cedula:$('#fp-cedula').value.trim(),fnac:$('#fp-fnac').value,sexo:$('#fp-sexo').value,
+    telefono:$('#fp-tel').value.trim(),email:$('#fp-email').value.trim(),ars:$('#fp-ars').value.trim(),
+    direccion:$('#fp-dir').value.trim(),alergias:$('#fp-alergias').value.trim(),
+    antPersonales:$('#fp-antp').value.trim(),antFamiliares:$('#fp-antf').value.trim(),
+    medsActuales:$('#fp-meds').value.trim(),seguimiento:$('#fp-seg').checked};
+  if(id){Object.assign(pacienteDe(id),data);logAction('Expediente actualizado: '+nombre)}
+  else{data.id=uid();data.creado=hoyISO();DB.pacientes.push(data);logAction('Paciente registrado: '+nombre)}
+  saveDB();closeModal();toast('Paciente guardado');render();
+}
+function delPaciente(id){
+  const p=pacienteDe(id);
+  if(!confirm(`¿Eliminar el expediente de ${p.nombre}? Se conservarán sus consultas y facturas en el historial, pero el expediente desaparecerá. Esta acción no se puede deshacer.`))return;
+  DB.pacientes=DB.pacientes.filter(x=>x.id!==id);
+  logAction('Expediente eliminado: '+p.nombre);saveDB();closeModal();go('pacientes');
+}
+
+/* ---------- Detalle de paciente (expediente) ---------- */
+function vPacienteDetalle(){
+  const p=pacienteDe(route.params.id);
+  if(!p)return `<div class="empty">Paciente no encontrado. <button class="btn ghost" onclick="go('pacientes')">Volver</button></div>`;
+  const consultas=DB.consultas.filter(c=>c.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const recetas=DB.recetas.filter(r=>r.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const facturas=DB.facturas.filter(f=>f.pacienteId===p.id).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const citas=DB.citas.filter(c=>c.pacienteId===p.id&&c.fecha>=hoyISO()&&c.estado!=='cancelada').sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const tab=route.params.tab||(esMedico()?'historia':'datos');
+  const wa=telLimpio(p.telefono);
+  return topbar('Expediente clínico','',
+    `<button class="btn secondary" onclick="go('pacientes')">← Pacientes</button>
+     ${esMedico()?`<button class="btn" onclick="formConsulta('${p.id}')">+ Nueva consulta</button>`:''}`)+`
+  <div class="chart-band">
+    <div class="avatar">${iniciales(p.nombre)}</div>
+    <div><h2>${esc(p.nombre)}</h2>
+      <div class="meta">${esc(p.cedula||'Sin cédula')} · ${p.sexo||''} ${edad(p.fnac)!==null?'· '+edad(p.fnac)+' años':''} · ${esc(p.ars||'Privado')} ${p.seguimiento?'· <span class="badge amber">En seguimiento</span>':''}</div></div>
+    <div class="vitals">
+      <div class="vital"><div class="v">${consultas.length}</div><div class="k">Consultas</div></div>
+      <div class="vital"><div class="v">${recetas.length}</div><div class="k">Recetas</div></div>
+      <div class="vital"><div class="v">${citas.length?fmtFecha(citas[0].fecha):'—'}</div><div class="k">Próxima cita</div></div>
+    </div>
+  </div>
+  ${p.alergias?`<div class="alert-strip">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn secondary sm" onclick="formCita('${p.id}')">📅 Agendar cita</button>
+    ${esMedico()?`<button class="btn secondary sm" onclick="formReceta('${p.id}')">℞ Nueva receta</button>
+    <button class="btn secondary sm" onclick="formCertificado('${p.id}')">📄 Certificado</button>`:''}
+    <button class="btn secondary sm" onclick="formFactura('${p.id}')">💵 Facturar</button>
+    ${wa?`<a class="btn secondary sm" style="text-decoration:none" target="_blank" href="https://wa.me/1${wa}?text=${encodeURIComponent('Hola '+p.nombre.split(' ')[0]+', le saludamos de la consulta de '+DB.config.medico+'.')}">💬 WhatsApp</a>`:''}
+  </div>
+  <div class="tabs">
+    ${(esMedico()?[['historia','Historia clínica'],['datos','Datos y antecedentes'],['recetas','Recetas'],['facturas','Facturas']]:[['datos','Datos y antecedentes'],['facturas','Facturas']]).map(([k,t])=>
+      `<button class="${tab===k?'active':''}" onclick="go('pacientes-detalle',{id:'${p.id}',tab:'${k}'})">${t}</button>`).join('')}
+  </div>
+  ${tab==='historia'&&esMedico()?tabHistoria(p,consultas):''}
+  ${tab==='datos'?tabDatos(p):''}
+  ${tab==='recetas'?tabRecetasPac(recetas):''}
+  ${tab==='facturas'?tabFacturasPac(facturas):''}`;
+}
+function tabHistoria(p,consultas){
+  if(!consultas.length)return `<div class="card"><div class="empty"><div class="big">🩺</div>Sin consultas registradas.<br><br><button class="btn" onclick="formConsulta('${p.id}')">Registrar primera consulta</button></div></div>`;
+  return `<div class="card"><div class="timeline">${consultas.map(c=>`
+    <div class="tl-item"><div class="tl-date">${fmtFecha(c.fecha)} ${c.tipo?'· '+esc(c.tipo):''}</div>
+      <div class="tl-body">
+        <b>Motivo:</b> ${esc(c.motivo)}<br>
+        ${c.examen?`<b>Examen / hallazgos:</b> ${esc(c.examen)}<br>`:''}
+        <b>Diagnóstico:</b> ${esc(c.diagnostico)} ${c.cie?`<span class="badge blue">${esc(c.cie)}</span>`:''}<br>
+        ${c.plan?`<b>Plan:</b> ${esc(c.plan)}<br>`:''}
+        ${c.phq9!=null?`<span class="badge ${c.phq9>=15?'red':c.phq9>=10?'amber':'green'}">PHQ-9: ${c.phq9}</span> `:''}
+        ${c.gad7!=null?`<span class="badge ${c.gad7>=15?'red':c.gad7>=10?'amber':'green'}">GAD-7: ${c.gad7}</span>`:''}
+        <div style="margin-top:8px"><button class="btn ghost sm" onclick="formConsulta('${p.id}','${c.id}')">Editar</button>
+        <button class="btn ghost sm" onclick="imprimirConsulta('${c.id}')">Imprimir resumen</button></div>
+      </div></div>`).join('')}</div></div>`;
+}
+function tabDatos(p){
+  const filas=[['Teléfono',p.telefono],['Correo',p.email],['Dirección',p.direccion],['ARS',p.ars||'Privado'],
+    ['Fecha de nacimiento',p.fnac?fmtFecha(p.fnac):''],['Antecedentes personales',p.antPersonales],
+    ['Antecedentes familiares',p.antFamiliares],['Medicamentos actuales',p.medsActuales]];
+  return `<div class="card">
+    ${filas.map(([k,v])=>`<div style="display:flex;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div style="width:210px;font-weight:600;font-size:12.5px;color:var(--ink2)">${k}</div>
+      <div style="flex:1">${esc(v||'—')}</div></div>`).join('')}
+    <div style="margin-top:14px"><button class="btn secondary" onclick="formPaciente('${p.id}')">Editar datos</button></div></div>`;
+}
+function tabRecetasPac(recetas){
+  if(!recetas.length)return `<div class="card"><div class="empty"><div class="big">℞</div>Sin recetas emitidas</div></div>`;
+  return `<div class="card"><table><thead><tr><th>Fecha</th><th>Medicamentos</th><th></th></tr></thead><tbody>
+  ${recetas.map(r=>`<tr><td>${fmtFecha(r.fecha)}</td>
+    <td>${r.items.map(i=>esc(i.med)).join(', ')}</td>
+    <td><button class="btn secondary sm" onclick="imprimirReceta('${r.id}')">🖨 Imprimir</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+function tabFacturasPac(facturas){
+  if(!facturas.length)return `<div class="card"><div class="empty"><div class="big">💵</div>Sin facturas</div></div>`;
+  return `<div class="card"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${facturas.map(f=>filaFactura(f)).join('')}</tbody></table></div>`;
+}
+</script>
+<script>
+/* =====================================================
+   AGENDA
+===================================================== */
+function vAgenda(){
+  const fecha=route.params.fecha||hoyISO();
+  const citas=DB.citas.filter(c=>c.fecha===fecha).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const d=new Date(fecha+'T12:00:00');
+  const mover=n=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+  return topbar('Agenda',d.toLocaleDateString('es-DO',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+    `<button class="btn" onclick="formCita(null,'${fecha}')">+ Nueva cita</button>`)+`
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${mover(-1)}'})">← Anterior</button>
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${hoyISO()}'})">Hoy</button>
+    <button class="btn secondary sm" onclick="go('agenda',{fecha:'${mover(1)}'})">Siguiente →</button>
+    <input type="date" value="${fecha}" onchange="go('agenda',{fecha:this.value})" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px">
+  </div>
+  <div class="card">
+  ${citas.length?`<table><thead><tr><th>Hora</th><th>Paciente</th><th>Motivo</th><th>Estado</th><th style="width:340px">Acciones</th></tr></thead><tbody>
+  ${citas.map(c=>{
+    const p=pacienteDe(c.pacienteId);const wa=p?telLimpio(p.telefono):'';
+    const msj=p?encodeURIComponent('Hola '+p.nombre.split(' ')[0]+', le recordamos su cita con '+DB.config.medico+' el '+fmtFecha(c.fecha)+' a las '+c.hora+'. Por favor confirme su asistencia. ¡Gracias!'):'';
+    return `<tr><td><b>${c.hora}</b></td>
+    <td class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})"><b>${esc(nombrePac(c.pacienteId))}</b></td>
+    <td>${esc(c.motivo||'')}</td><td>${badgeCita(c.estado)}</td>
+    <td style="white-space:nowrap">
+      ${c.estado==='programada'&&wa?`<a class="btn secondary sm" style="text-decoration:none" target="_blank" href="https://wa.me/1${wa}?text=${msj}" onclick="setCita('${c.id}','confirmada')">💬 Recordar</a> `:''}
+      ${['programada','confirmada'].includes(c.estado)?`
+        <button class="btn sm" onclick="atenderCita('${c.id}')">Atender</button>
+        <button class="btn secondary sm" onclick="setCita('${c.id}','ausente')">Ausente</button>
+        <button class="btn secondary sm" onclick="setCita('${c.id}','cancelada')">Cancelar</button>`:''}
+      <button class="btn ghost sm" onclick="delCita('${c.id}')">✕</button>
+    </td></tr>`;}).join('')}</tbody></table>`
+  :`<div class="empty"><div class="big">📅</div>Sin citas para este día<br><br><button class="btn" onclick="formCita(null,'${fecha}')">Agendar cita</button></div>`}
+  </div>
+  <div class="info-strip" style="margin-top:14px">💡 El botón <b>Recordar</b> abre WhatsApp con el mensaje de recordatorio listo para enviar y marca la cita como confirmada.</div>`;
+}
+function formCita(pacId,fecha){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  openModal(`<h3>Nueva cita</h3><div class="form-grid">
+    <div class="field full"><label>Paciente *</label><select id="fc-pac">
+      ${DB.pacientes.map(p=>`<option value="${p.id}" ${p.id===pacId?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha *</label><input type="date" id="fc-fecha" value="${fecha||hoyISO()}"></div>
+    <div class="field"><label>Hora *</label><input type="time" id="fc-hora" value="09:00"></div>
+    <div class="field full"><label>Motivo</label><input id="fc-motivo" placeholder="Primera vez, seguimiento, resultados…"></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveCita()">Agendar</button></div>`);
+}
+function saveCita(){
+  const c={id:uid(),pacienteId:$('#fc-pac').value,fecha:$('#fc-fecha').value,hora:$('#fc-hora').value,
+    motivo:$('#fc-motivo').value.trim(),estado:'programada'};
+  if(!c.fecha||!c.hora){toast('Fecha y hora son obligatorias');return}
+  if(DB.citas.some(x=>x.fecha===c.fecha&&x.hora===c.hora&&x.estado!=='cancelada')){
+    if(!confirm('Ya existe una cita a esa hora. ¿Agendar de todos modos?'))return;
+  }
+  DB.citas.push(c);logAction('Cita agendada: '+nombrePac(c.pacienteId)+' '+fmtFecha(c.fecha)+' '+c.hora);
+  saveDB();closeModal();toast('Cita agendada');render();
+}
+function setCita(id,estado){const c=DB.citas.find(x=>x.id===id);if(!c)return;c.estado=estado;
+  logAction('Cita '+estado+': '+nombrePac(c.pacienteId));saveDB();render()}
+function delCita(id){if(!confirm('¿Eliminar esta cita?'))return;DB.citas=DB.citas.filter(c=>c.id!==id);saveDB();render()}
+function atenderCita(id){const c=DB.citas.find(x=>x.id===id);if(!c)return;c.estado='completada';saveDB();if(esMedico())formConsulta(c.pacienteId);else render()}
+
+/* =====================================================
+   CONSULTAS (nota clínica + escalas)
+===================================================== */
+function vConsultas(){
+  const lista=[...DB.consultas].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,100);
+  return topbar('Consultas','Historial de notas clínicas',
+    `<button class="btn" onclick="formConsulta()">+ Nueva consulta</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Motivo</th><th>Diagnóstico</th><th></th></tr></thead><tbody>
+  ${lista.map(c=>`<tr class="clickable" onclick="go('pacientes-detalle',{id:'${c.pacienteId}'})">
+    <td>${fmtFecha(c.fecha)}</td><td><b>${esc(nombrePac(c.pacienteId))}</b></td>
+    <td>${esc(c.motivo)}</td><td>${esc(c.diagnostico)} ${c.cie?`<span class="badge blue">${esc(c.cie)}</span>`:''}</td>
+    <td><button class="btn secondary sm" onclick="event.stopPropagation();imprimirConsulta('${c.id}')">🖨</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">🩺</div>Sin consultas registradas</div>`}</div>`;
+}
+const PHQ9=['Poco interés o placer en hacer cosas','Decaído(a), deprimido(a) o sin esperanzas','Problemas para dormir o dormir demasiado','Cansancio o poca energía','Poco apetito o comer en exceso','Sentirse mal consigo mismo(a) o como un fracaso','Dificultad para concentrarse','Lentitud o inquietud notable al moverse/hablar','Pensamientos de que estaría mejor muerto(a) o de hacerse daño'];
+const GAD7=['Sentirse nervioso(a), ansioso(a) o con los nervios de punta','No poder dejar de preocuparse o controlarlo','Preocuparse demasiado por diferentes cosas','Dificultad para relajarse','Inquietud, no poder quedarse quieto(a)','Irritarse o enojarse con facilidad','Miedo de que algo terrible pueda pasar'];
+function bloqueEscala(pref,items,valores){
+  return `<div class="scale-grid" style="margin-top:8px">
+    <div></div><div style="text-align:center;font-size:10.5px;color:var(--muted)">Nunca<br>0</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Varios días<br>1</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Más de la mitad<br>2</div>
+    <div style="text-align:center;font-size:10.5px;color:var(--muted)">Casi a diario<br>3</div>
+    ${items.map((q,i)=>`<div class="sq">${i+1}. ${q}</div>`+[0,1,2,3].map(v=>
+      `<label><input type="radio" name="${pref}-${i}" value="${v}" ${valores&&valores[i]===v?'checked':''} onchange="calcEscala('${pref}',${items.length})"><span>${v}</span></label>`).join('')).join('')}
+  </div><div style="margin-top:8px">Puntuación: <span class="score-pill" id="${pref}-total">${valores?valores.reduce((a,b)=>a+b,0):'—'}</span> <span id="${pref}-interp" style="font-size:12px;color:var(--muted)"></span></div>`;
+}
+function calcEscala(pref,n){
+  let t=0,c=0;
+  for(let i=0;i<n;i++){const r=document.querySelector(`input[name="${pref}-${i}"]:checked`);if(r){t+=Number(r.value);c++}}
+  document.getElementById(pref+'-total').textContent=c?t:'—';
+  const interp=pref==='phq'
+    ?(t<5?'mínima':t<10?'leve':t<15?'moderada':t<20?'moderadamente grave':'grave')
+    :(t<5?'mínima':t<10?'leve':t<15?'moderada':'grave');
+  document.getElementById(pref+'-interp').textContent=c===n?`(sintomatología ${interp})`:`(${c}/${n} respondidas)`;
+}
+function leerEscala(pref,n){
+  const vals=[];
+  for(let i=0;i<n;i++){const r=document.querySelector(`input[name="${pref}-${i}"]:checked`);if(!r)return null;vals.push(Number(r.value))}
+  return vals;
+}
+function formConsulta(pacId,consId){
+  if(!esMedico()){toast('Solo el médico puede registrar consultas');return}
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const c=consId?DB.consultas.find(x=>x.id===consId):{};
+  const p=pacienteDe(pacId||c.pacienteId);
+  openModal(`<h3>${consId?'Editar consulta':'Nueva consulta'}</h3>
+  ${p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
+  <div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="fn-pac" ${consId?'disabled':''}>
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===(pacId||c.pacienteId)?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fn-fecha" value="${c.fecha||hoyISO()}"></div>
+    <div class="field"><label>Tipo</label><select id="fn-tipo">
+      ${['Primera vez','Seguimiento','Urgencia','Teleconsulta','Resultados'].map(t=>`<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label>Código CIE-10 (opcional)</label><input id="fn-cie" value="${esc(c.cie||'')}" placeholder="F32.1, I10, E11.9…"></div>
+    <div class="field full"><label>Motivo de consulta *</label><textarea id="fn-motivo">${esc(c.motivo||'')}</textarea></div>
+    <div class="field full"><label>Examen físico / mental y hallazgos</label><textarea id="fn-examen">${esc(c.examen||'')}</textarea></div>
+    <div class="field full"><label>Diagnóstico *</label><input id="fn-dx" value="${esc(c.diagnostico||'')}"></div>
+    <div class="field full"><label>Plan de tratamiento e indicaciones</label><textarea id="fn-plan">${esc(c.plan||'')}</textarea></div>
+    <div class="field full"><details ${c.phq9vals?'open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px">📋 Escala PHQ-9 (depresión)</summary>${bloqueEscala('phq',PHQ9,c.phq9vals)}</details></div>
+    <div class="field full"><details ${c.gad7vals?'open':''}><summary style="cursor:pointer;font-weight:600;font-size:13px">📋 Escala GAD-7 (ansiedad)</summary>${bloqueEscala('gad',GAD7,c.gad7vals)}</details></div>
+  </div>
+  <div class="modal-actions">
+    ${consId?`<button class="btn danger" style="margin-right:auto" onclick="delConsulta('${consId}')">Eliminar</button>`:''}
+    <button class="btn secondary" onclick="closeModal()">Cancelar</button>
+    <button class="btn" onclick="saveConsulta('${consId||''}')">Guardar consulta</button></div>`,true);
+  if(c.phq9vals)calcEscala('phq',9);if(c.gad7vals)calcEscala('gad',7);
+}
+function saveConsulta(consId){
+  const motivo=$('#fn-motivo').value.trim(),dx=$('#fn-dx').value.trim();
+  if(!motivo||!dx){toast('Motivo y diagnóstico son obligatorios');return}
+  const phq=leerEscala('phq',9),gad=leerEscala('gad',7);
+  const data={pacienteId:$('#fn-pac').value,fecha:$('#fn-fecha').value,tipo:$('#fn-tipo').value,
+    cie:$('#fn-cie').value.trim(),motivo,examen:$('#fn-examen').value.trim(),diagnostico:dx,plan:$('#fn-plan').value.trim(),
+    phq9:phq?phq.reduce((a,b)=>a+b,0):null,phq9vals:phq,gad7:gad?gad.reduce((a,b)=>a+b,0):null,gad7vals:gad};
+  if(consId){Object.assign(DB.consultas.find(x=>x.id===consId),data);logAction('Consulta editada: '+nombrePac(data.pacienteId))}
+  else{data.id=uid();DB.consultas.push(data);logAction('Consulta registrada: '+nombrePac(data.pacienteId)+' — '+dx)}
+  saveDB();closeModal();toast('Consulta guardada');go('pacientes-detalle',{id:data.pacienteId});
+}
+function delConsulta(id){if(!confirm('¿Eliminar esta consulta del historial?'))return;
+  DB.consultas=DB.consultas.filter(c=>c.id!==id);saveDB();closeModal();render()}
+function imprimirConsulta(id){
+  const c=DB.consultas.find(x=>x.id===id);if(!c)return;const p=pacienteDe(c.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">Resumen de consulta</div>
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(c.fecha)}</span></div>
+    <div class="doc-row"><span><b>Cédula:</b> ${esc(p.cedula||'—')}</span><span><b>Edad:</b> ${edad(p.fnac)??'—'} años</span></div>
+    <div class="doc-body">
+      <p><b>Motivo de consulta:</b> ${esc(c.motivo)}</p>
+      ${c.examen?`<p><b>Hallazgos:</b> ${esc(c.examen)}</p>`:''}
+      <p><b>Diagnóstico:</b> ${esc(c.diagnostico)}${c.cie?' ('+esc(c.cie)+')':''}</p>
+      ${c.plan?`<p><b>Plan e indicaciones:</b> ${esc(c.plan)}</p>`:''}
+      ${c.phq9!=null?`<p><b>PHQ-9:</b> ${c.phq9}/27</p>`:''}${c.gad7!=null?`<p><b>GAD-7:</b> ${c.gad7}/21</p>`:''}
+    </div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+</script>
+<script>
+/* =====================================================
+   RECETAS
+===================================================== */
+function vRecetas(){
+  const lista=[...DB.recetas].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,100);
+  return topbar('Recetas','Recetario digital con membrete',
+    `<button class="btn" onclick="formReceta()">+ Nueva receta</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Medicamentos</th><th></th></tr></thead><tbody>
+  ${lista.map(r=>`<tr><td>${fmtFecha(r.fecha)}</td><td><b>${esc(nombrePac(r.pacienteId))}</b></td>
+    <td>${r.items.map(i=>esc(i.med)).join(', ')}</td>
+    <td style="white-space:nowrap"><button class="btn secondary sm" onclick="imprimirReceta('${r.id}')">🖨 Imprimir</button>
+    <button class="btn ghost sm" onclick="delReceta('${r.id}')">✕</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">℞</div>Sin recetas emitidas</div>`}</div>`;
+}
+function filaMedHTML(i,item){
+  item=item||{};
+  return `<div class="form-grid" style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px" data-med-row>
+    <div class="field full"><label>Medicamento ${i+1}</label><input class="fr-med" value="${esc(item.med||'')}" placeholder="Sertralina 50 mg tabletas"></div>
+    <div class="field"><label>Dosis / frecuencia</label><input class="fr-dosis" value="${esc(item.dosis||'')}" placeholder="1 tableta cada 24 h en la mañana"></div>
+    <div class="field"><label>Duración / cantidad</label><input class="fr-dur" value="${esc(item.dur||'')}" placeholder="por 30 días · #30"></div>
+  </div>`;
+}
+function formReceta(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const p=pacienteDe(pacId);
+  openModal(`<h3>Nueva receta</h3>
+  <div id="fr-alergia">${p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS DEL PACIENTE: ${esc(p.alergias)}</div>`:''}</div>
+  <div class="form-grid" style="margin-bottom:10px">
+    <div class="field"><label>Paciente *</label><select id="fr-pac" onchange="frAlergia()">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fr-fecha" value="${hoyISO()}"></div>
+  </div>
+  <div id="fr-meds">${filaMedHTML(0)}</div>
+  <button class="btn secondary sm" onclick="addMedRow()">+ Agregar medicamento</button>
+  <div class="field" style="margin-top:12px"><label>Indicaciones generales (opcional)</label><textarea id="fr-indic" placeholder="Tomar con alimentos, evitar alcohol, retornar en 4 semanas…"></textarea></div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveReceta()">Guardar e imprimir</button></div>`,true);
+}
+function frAlergia(){const p=pacienteDe($('#fr-pac').value);
+  $('#fr-alergia').innerHTML=p&&p.alergias?`<div class="alert-strip">⚠ ALERGIAS DEL PACIENTE: ${esc(p.alergias)}</div>`:''}
+function addMedRow(){const box=$('#fr-meds');const n=box.querySelectorAll('[data-med-row]').length;
+  box.insertAdjacentHTML('beforeend',filaMedHTML(n))}
+function saveReceta(){
+  const pacId=$('#fr-pac').value,p=pacienteDe(pacId);
+  const items=[...document.querySelectorAll('[data-med-row]')].map(r=>({
+    med:r.querySelector('.fr-med').value.trim(),dosis:r.querySelector('.fr-dosis').value.trim(),dur:r.querySelector('.fr-dur').value.trim()
+  })).filter(i=>i.med);
+  if(!items.length){toast('Agrega al menos un medicamento');return}
+  // Alerta cruzada simple contra alergias registradas
+  if(p&&p.alergias){
+    const alg=p.alergias.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(s=>s.length>3);
+    const choque=items.find(i=>alg.some(a=>i.med.toLowerCase().includes(a)));
+    if(choque&&!confirm('⚠ POSIBLE CONFLICTO: "'+choque.med+'" coincide con una alergia registrada ('+p.alergias+'). ¿Continuar de todos modos?'))return;
+  }
+  const r={id:uid(),pacienteId:pacId,fecha:$('#fr-fecha').value,items,indicaciones:$('#fr-indic').value.trim()};
+  DB.recetas.push(r);logAction('Receta emitida: '+nombrePac(pacId));saveDB();closeModal();render();
+  imprimirReceta(r.id);
+}
+function delReceta(id){if(!confirm('¿Eliminar esta receta?'))return;DB.recetas=DB.recetas.filter(r=>r.id!==id);saveDB();render()}
+function imprimirReceta(id){
+  const r=DB.recetas.find(x=>x.id===id);if(!r)return;const p=pacienteDe(r.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(r.fecha)}</span></div>
+    <div class="doc-row"><span><b>Edad:</b> ${edad(p.fnac)??'—'} años</span><span><b>Cédula:</b> ${esc(p.cedula||'—')}</span></div>
+    <div class="doc-body"><ol>
+      ${r.items.map(i=>`<li><b>${esc(i.med)}</b><br>${esc(i.dosis)}${i.dur?' — '+esc(i.dur):''}</li>`).join('')}
+    </ol>${r.indicaciones?`<p style="margin-top:14px"><b>Indicaciones:</b> ${esc(r.indicaciones)}</p>`:''}</div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+
+/* =====================================================
+   CERTIFICADOS
+===================================================== */
+function vCertificados(){
+  const lista=[...DB.certificados].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return topbar('Certificados médicos','Constancias y certificados imprimibles',
+    `<button class="btn" onclick="formCertificado()">+ Nuevo certificado</button>`)+`
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Paciente</th><th>Tipo</th><th></th></tr></thead><tbody>
+  ${lista.map(c=>`<tr><td>${fmtFecha(c.fecha)}</td><td><b>${esc(nombrePac(c.pacienteId))}</b></td><td>${esc(c.tipo)}</td>
+    <td style="white-space:nowrap"><button class="btn secondary sm" onclick="imprimirCert('${c.id}')">🖨 Imprimir</button>
+    <button class="btn ghost sm" onclick="delCert('${c.id}')">✕</button></td></tr>`).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">📄</div>Sin certificados emitidos</div>`}</div>`;
+}
+function formCertificado(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const plantillas={
+    'Certificado médico':'Certifico que he examinado en el día de hoy a [PACIENTE], quien se encuentra en condiciones de salud aptas para [ACTIVIDAD].',
+    'Reposo / licencia':'Certifico que [PACIENTE] fue atendido(a) en esta consulta y por su condición de salud amerita reposo por [N] días a partir de la fecha.',
+    'Constancia de asistencia':'Hago constar que [PACIENTE] asistió a consulta médica en el día de hoy en horario de [HORA].'
+  };
+  openModal(`<h3>Nuevo certificado</h3><div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="fx-pac">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fx-fecha" value="${hoyISO()}"></div>
+    <div class="field full"><label>Tipo</label><select id="fx-tipo" onchange="document.getElementById('fx-texto').value=this.dataset[this.selectedIndex]||''">
+      ${Object.keys(plantillas).map(t=>`<option>${t}</option>`).join('')}</select></div>
+    <div class="field full"><label>Texto del certificado *</label><textarea id="fx-texto" rows="6">${plantillas['Certificado médico']}</textarea>
+      <div class="hint">Reemplaza los campos entre corchetes antes de imprimir.</div></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveCert()">Guardar e imprimir</button></div>`);
+  const sel=$('#fx-tipo');Object.values(plantillas).forEach((v,i)=>sel.dataset[i]=v);
+}
+function saveCert(){
+  const c={id:uid(),pacienteId:$('#fx-pac').value,fecha:$('#fx-fecha').value,tipo:$('#fx-tipo').value,texto:$('#fx-texto').value.trim()};
+  if(!c.texto){toast('El texto es obligatorio');return}
+  DB.certificados.push(c);logAction('Certificado emitido: '+c.tipo+' — '+nombrePac(c.pacienteId));
+  saveDB();closeModal();render();imprimirCert(c.id);
+}
+function delCert(id){if(!confirm('¿Eliminar?'))return;DB.certificados=DB.certificados.filter(c=>c.id!==id);saveDB();render()}
+function imprimirCert(id){
+  const c=DB.certificados.find(x=>x.id===id);if(!c)return;const p=pacienteDe(c.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">${esc(c.tipo)}</div>
+    <div class="doc-body" style="min-height:140px">
+      <p>A quien pueda interesar:</p><br>
+      <p style="text-align:justify">${esc(c.texto).replace(/\[PACIENTE\]/g,'<b>'+esc(p.nombre)+'</b>'+(p.cedula?', cédula '+esc(p.cedula):''))}</p>
+      <br><p>Se expide el presente a solicitud de la parte interesada, en ${esc(DB.config.direccion.split(',').pop()||'')} a los ${new Date(c.fecha+'T12:00:00').getDate()} días del mes de ${new Date(c.fecha+'T12:00:00').toLocaleDateString('es-DO',{month:'long'})} de ${c.fecha.slice(0,4)}.</p>
+    </div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}<br>Exequátur ${esc(DB.config.exequatur)}</div></div>
+    ${docFooter()}</div>`);
+}
+
+/* =====================================================
+   FACTURACIÓN
+===================================================== */
+function filaFactura(f){
+  return `<tr><td>${fmtFecha(f.fecha)}</td><td>${esc(f.concepto)}${f.ncf?`<br><span style="font-size:11px;color:var(--muted)">NCF: ${esc(f.ncf)}</span>`:''}</td>
+    <td><b>${fmtMoney(f.monto)}</b>${f.ars?`<br><span style="font-size:11px;color:var(--muted)">${esc(f.ars)}</span>`:''}</td>
+    <td>${f.estado==='pagada'?'<span class="badge green">Pagada</span>':'<span class="badge amber">Pendiente</span>'}</td>
+    <td style="white-space:nowrap">${f.estado==='pendiente'?`<button class="btn sm" onclick="pagarFactura('${f.id}')">Marcar pagada</button> `:''}
+    <button class="btn secondary sm" onclick="imprimirFactura('${f.id}')">🖨</button>
+    <button class="btn ghost sm" onclick="delFactura('${f.id}')">✕</button></td></tr>`;
+}
+function vFacturacion(){
+  const lista=[...DB.facturas].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const pend=lista.filter(f=>f.estado==='pendiente').reduce((s,f)=>s+Number(f.monto),0);
+  const mesAct=hoyISO().slice(0,7);
+  const cobradoMes=lista.filter(f=>f.estado==='pagada'&&f.fecha.slice(0,7)===mesAct).reduce((s,f)=>s+Number(f.monto),0);
+  return topbar('Facturación','Cobros, recibos y cuentas por cobrar',
+    `<button class="btn" onclick="formFactura()">+ Nueva factura</button>`)+`
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="card kpi"><div class="num">${fmtMoney(cobradoMes)}</div><div class="lbl">Cobrado este mes</div></div>
+    <div class="card kpi"><div class="num" style="color:${pend?'var(--amber)':'inherit'}">${fmtMoney(pend)}</div><div class="lbl">Por cobrar</div></div>
+    <div class="card kpi"><div class="num">${lista.length}</div><div class="lbl">Facturas emitidas</div></div>
+  </div>
+  <div class="card">
+  ${lista.length?`<table><thead><tr><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${lista.map(f=>filaFactura(f).replace('<td>'+fmtFecha(f.fecha)+'</td>','<td>'+fmtFecha(f.fecha)+'<br><b style="font-size:12px">'+esc(nombrePac(f.pacienteId))+'</b></td>')).join('')}
+  </tbody></table>`:`<div class="empty"><div class="big">💵</div>Sin facturas registradas</div>`}</div>`;
+}
+function formFactura(pacId){
+  if(!DB.pacientes.length){toast('Primero registra un paciente');formPaciente();return}
+  const p=pacienteDe(pacId);
+  openModal(`<h3>Nueva factura / recibo</h3><div class="form-grid">
+    <div class="field"><label>Paciente *</label><select id="ff-pac">
+      ${DB.pacientes.map(x=>`<option value="${x.id}" ${x.id===pacId?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label>Fecha</label><input type="date" id="ff-fecha" value="${hoyISO()}"></div>
+    <div class="field full"><label>Concepto *</label><input id="ff-conc" value="Consulta médica"></div>
+    <div class="field"><label>Monto (${DB.config.moneda}) *</label><input type="number" id="ff-monto" value="${DB.config.precioConsulta}" min="0" step="any"></div>
+    <div class="field"><label>Estado</label><select id="ff-estado"><option value="pagada">Pagada</option><option value="pendiente">Pendiente de cobro</option></select></div>
+    <div class="field"><label>ARS / forma de pago</label><input id="ff-ars" value="${esc(p&&p.ars?p.ars:'')}" placeholder="Efectivo, tarjeta, SeNaSa…"></div>
+    <div class="field"><label>NCF (comprobante fiscal, opcional)</label><input id="ff-ncf" placeholder="B0100000001"></div>
+  </div>
+  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button>
+  <button class="btn" onclick="saveFactura()">Guardar</button></div>`);
+}
+function saveFactura(){
+  const monto=Number($('#ff-monto').value);
+  if(!monto||monto<=0){toast('Monto inválido');return}
+  const f={id:uid(),pacienteId:$('#ff-pac').value,fecha:$('#ff-fecha').value,concepto:$('#ff-conc').value.trim()||'Consulta',
+    monto,estado:$('#ff-estado').value,ars:$('#ff-ars').value.trim(),ncf:$('#ff-ncf').value.trim(),num:(DB.facturas.length+1).toString().padStart(5,'0')};
+  DB.facturas.push(f);logAction('Factura #'+f.num+' — '+nombrePac(f.pacienteId)+' '+fmtMoney(monto));
+  saveDB();closeModal();toast('Factura registrada');render();
+}
+function pagarFactura(id){const f=DB.facturas.find(x=>x.id===id);if(!f)return;f.estado='pagada';
+  logAction('Cobro registrado: factura #'+f.num);saveDB();render();toast('Cobro registrado')}
+function delFactura(id){if(!confirm('¿Eliminar esta factura?'))return;DB.facturas=DB.facturas.filter(f=>f.id!==id);saveDB();render()}
+function imprimirFactura(id){
+  const f=DB.facturas.find(x=>x.id===id);if(!f)return;const p=pacienteDe(f.pacienteId)||{nombre:'(eliminado)'};
+  imprimirDoc(`<div class="doc">${docHeader()}
+    <div class="doc-title">Recibo / Factura Nº ${f.num}</div>
+    <div class="doc-row"><span><b>Paciente:</b> ${esc(p.nombre)}</span><span><b>Fecha:</b> ${fmtFecha(f.fecha)}</span></div>
+    ${f.ncf?`<div class="doc-row"><span><b>NCF:</b> ${esc(f.ncf)}</span><span></span></div>`:''}
+    <div class="doc-body" style="min-height:80px"><table><tr><th>Concepto</th><th style="width:160px">Monto</th></tr>
+      <tr><td>${esc(f.concepto)}</td><td>${fmtMoney(f.monto)}</td></tr>
+      <tr><td style="text-align:right"><b>Total</b></td><td><b>${fmtMoney(f.monto)}</b></td></tr></table>
+      <p style="margin-top:10px">Estado: <b>${f.estado==='pagada'?'PAGADA':'PENDIENTE DE PAGO'}</b>${f.ars?' · '+esc(f.ars):''}</p></div>
+    <div class="doc-sign"><div class="line">${esc(DB.config.medico)}</div></div>
+    ${docFooter()}</div>`);
+}
+</script>
+<script>
+/* =====================================================
+   REPORTES
+===================================================== */
+function vReportes(){
+  // Ingresos últimos 6 meses
+  const meses=[];const d=new Date();
+  for(let i=5;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);
+    meses.push({key:x.toISOString().slice(0,7),lbl:x.toLocaleDateString('es-DO',{month:'short'})})}
+  const ingresos=meses.map(m=>DB.facturas.filter(f=>f.estado==='pagada'&&f.fecha.slice(0,7)===m.key).reduce((s,f)=>s+Number(f.monto),0));
+  const maxIng=Math.max(...ingresos,1);
+  const consultasMes=meses.map(m=>DB.consultas.filter(c=>c.fecha.slice(0,7)===m.key).length);
+  const maxCon=Math.max(...consultasMes,1);
+  // Top diagnósticos
+  const dxCount={};DB.consultas.forEach(c=>{const k=(c.diagnostico||'').trim();if(k)dxCount[k]=(dxCount[k]||0)+1});
+  const topDx=Object.entries(dxCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  // ARS
+  const arsCount={};DB.facturas.filter(f=>f.estado==='pagada').forEach(f=>{const k=f.ars||'Privado / efectivo';arsCount[k]=(arsCount[k]||0)+Number(f.monto)});
+  const topArs=Object.entries(arsCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  // Ausentismo por mes
+  const aus=meses.map(m=>{
+    const del=DB.citas.filter(c=>c.fecha.slice(0,7)===m.key&&['completada','ausente'].includes(c.estado));
+    return del.length?Math.round(del.filter(c=>c.estado==='ausente').length/del.length*100):0});
+  return topbar('Reportes','Inteligencia de la consulta — últimos 6 meses','')+`
+  <div class="grid grid-2" style="margin-bottom:16px">
+    <div class="card"><h3>Ingresos cobrados por mes</h3>
+      <div class="bars">${meses.map((m,i)=>`<div class="bar-col"><div class="bv">${ingresos[i]?Math.round(ingresos[i]/1000)+'k':''}</div>
+        <div class="bar" style="height:${Math.max(ingresos[i]/maxIng*100,2)}%"></div><div class="bl">${m.lbl}</div></div>`).join('')}</div></div>
+    <div class="card"><h3>Consultas realizadas por mes</h3>
+      <div class="bars">${meses.map((m,i)=>`<div class="bar-col"><div class="bv">${consultasMes[i]||''}</div>
+        <div class="bar" style="height:${Math.max(consultasMes[i]/maxCon*100,2)}%;background:var(--blue)"></div><div class="bl">${m.lbl}</div></div>`).join('')}</div></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="card"><h3>Diagnósticos más frecuentes</h3>
+      ${topDx.length?topDx.map(([dx,n])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(dx)}</span><b>${n}</b></div>`).join(''):'<div class="empty">Sin datos aún</div>'}</div>
+    <div class="card"><h3>Ingresos por ARS / forma de pago</h3>
+      ${topArs.length?topArs.map(([a,m])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)">
+        <span>${esc(a)}</span><b>${fmtMoney(m)}</b></div>`).join(''):'<div class="empty">Sin datos aún</div>'}
+      <h3 style="margin-top:18px">Ausentismo por mes</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${meses.map((m,i)=>`<span class="badge ${aus[i]>20?'red':aus[i]>10?'amber':'green'}">${m.lbl}: ${aus[i]}%</span>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+/* =====================================================
+   CONFIGURACIÓN
+===================================================== */
+function vConfig(){
+  const c=DB.config;
+  return topbar('Configuración','Datos del consultorio, respaldo y seguridad','')+`
+  <div class="grid grid-2">
+    <div class="card"><h3>Datos del médico y consultorio</h3>
+      <div class="form-grid">
+        <div class="field full"><label>Nombre del médico</label><input id="cf-medico" value="${esc(c.medico)}"></div>
+        <div class="field"><label>Especialidad</label><input id="cf-esp" value="${esc(c.especialidad)}"></div>
+        <div class="field"><label>Exequátur</label><input id="cf-exe" value="${esc(c.exequatur)}"></div>
+        <div class="field"><label>Nº CMD (opcional)</label><input id="cf-cmd" value="${esc(c.cmd||'')}"></div>
+        <div class="field"><label>Teléfono</label><input id="cf-tel" value="${esc(c.telefono)}"></div>
+        <div class="field full"><label>Consultorio / centro</label><input id="cf-cons" value="${esc(c.consultorio)}"></div>
+        <div class="field full"><label>Dirección</label><input id="cf-dir" value="${esc(c.direccion)}"></div>
+        <div class="field"><label>Correo</label><input id="cf-email" value="${esc(c.email||'')}"></div>
+        <div class="field"><label>Precio consulta por defecto</label><input type="number" id="cf-precio" value="${c.precioConsulta}"></div>
+      </div>
+      <div style="margin-top:14px"><button class="btn" onclick="saveConfig()">Guardar configuración</button></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h3>Equipo</h3>
+        <p style="font-size:13px;color:var(--muted)">Sesión: <b>${esc(SESION.email)}</b> (${SESION.rol==='medico'?'médico':'secretaria'})</p>
+        ${SESION.rol==='medico'?`<p style="font-size:13px;color:var(--muted);margin-top:8px">Para dar acceso a tu secretaria, pídele que cree una cuenta tipo <b>Secretaria</b> con este código de vinculación:</p>
+        <div style="background:var(--accent-soft);border:1px dashed var(--accent);border-radius:8px;padding:10px;margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all">${SESION.userId}</div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">La secretaria podrá manejar pacientes, agenda y facturación, pero <b>no</b> podrá leer las notas clínicas (protegido por la base de datos).</p>`:''}
+      </div>
+      <div class="card" style="margin-bottom:16px"><h3>Respaldo de datos</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Exporta todos los datos (pacientes, consultas, recetas, facturas) a un archivo JSON. Guárdalo en un lugar seguro con regularidad. Puedes importarlo para restaurar o migrar.</p>
+        <button class="btn secondary" onclick="exportar()">⬇ Exportar respaldo</button>
+        <button class="btn secondary" onclick="document.getElementById('cf-import').click()">⬆ Importar respaldo</button>
+        <input type="file" id="cf-import" accept=".json" style="display:none" onchange="importar(this)">
+      </div>
+      <div class="card" style="margin-bottom:16px"><h3>Registro de auditoría</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Últimas acciones registradas en el sistema (${DB.log.length}).</p>
+        <div style="max-height:220px;overflow-y:auto">
+        ${DB.log.slice(0,40).map(l=>`<div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12px">
+          <span style="color:var(--muted)">${fmtFecha(l.t,true)}</span> — ${esc(l.txt)}</div>`).join('')||'<div class="empty">Sin actividad</div>'}</div>
+      </div>
+      <div class="card"><h3>Zona de riesgo</h3>
+        <button class="btn secondary" onclick="seedDemo()">Cargar datos de ejemplo</button>
+        <button class="btn danger" onclick="borrarTodo()">Borrar todos los datos</button>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">Los datos se guardan cifrados en tránsito en tu proyecto de Supabase, con aislamiento por médico y roles a nivel de base de datos. Activa los respaldos automáticos en Supabase (Database → Backups) y usa contraseñas fuertes (Ley 172-13).</p>
+      </div>
+    </div>
+  </div>`;
+}
+function saveConfig(){
+  Object.assign(DB.config,{medico:$('#cf-medico').value.trim(),especialidad:$('#cf-esp').value.trim(),
+    exequatur:$('#cf-exe').value.trim(),cmd:$('#cf-cmd').value.trim(),telefono:$('#cf-tel').value.trim(),
+    consultorio:$('#cf-cons').value.trim(),direccion:$('#cf-dir').value.trim(),email:$('#cf-email').value.trim(),
+    precioConsulta:Number($('#cf-precio').value)||0});
+  logAction('Configuración actualizada');saveDB();toast('Configuración guardada');renderNav();
+}
+function exportar(){
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='respaldo-medconsulta-'+hoyISO()+'.json';a.click();
+  logAction('Respaldo exportado');toast('Respaldo descargado');
+}
+function importar(input){
+  const file=input.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{try{
+    const d=JSON.parse(r.result);
+    if(!d.pacientes||!Array.isArray(d.pacientes))throw new Error('Formato inválido');
+    if(!confirm('Se reemplazarán TODOS los datos actuales con el respaldo ('+d.pacientes.length+' pacientes). ¿Continuar?'))return;
+    DB=d;saveDB();toast('Respaldo restaurado');render();
+  }catch(e){toast('El archivo no es un respaldo válido')}};
+  r.readAsText(file);input.value='';
+}
+function borrarTodo(){
+  if(!confirm('¿Borrar TODOS los datos del sistema? Esta acción no se puede deshacer. Exporta un respaldo primero si tienes dudas.'))return;
+  if(!confirm('Confirmación final: se eliminarán todos los pacientes, consultas, recetas y facturas.'))return;
+  const cfg=DB.config;
+  DB={config:cfg,pacientes:[],citas:[],consultas:[],recetas:[],certificados:[],facturas:[],log:[]};
+  saveDB();toast('Datos eliminados');go('dashboard');
+}
+
+/* ---------- Datos de ejemplo ---------- */
+function seedDemo(){
+  if(DB.pacientes.length&&!confirm('Se agregarán pacientes de ejemplo a los datos existentes. ¿Continuar?'))return;
+  const hoy=new Date();const dISO=n=>{const x=new Date(hoy);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+  const p1={id:uid(),creado:dISO(-120),nombre:'María Altagracia Peña',cedula:'402-1234567-8',fnac:'1985-03-12',sexo:'Femenino',telefono:'809-555-1234',ars:'SeNaSa',direccion:'Bonao, Monseñor Nouel',alergias:'Penicilina',antPersonales:'Hipertensión arterial en tratamiento',antFamiliares:'Madre con DM2',medsActuales:'Losartán 50 mg/día',seguimiento:true,email:''};
+  const p2={id:uid(),creado:dISO(-60),nombre:'José Manuel Rodríguez',cedula:'001-7654321-0',fnac:'1992-11-04',sexo:'Masculino',telefono:'829-555-9876',ars:'',direccion:'La Vega',alergias:'',antPersonales:'',antFamiliares:'',medsActuales:'',seguimiento:false,email:''};
+  const p3={id:uid(),creado:dISO(-15),nombre:'Carmen Rosa Jiménez',cedula:'048-2223334-5',fnac:'2001-07-22',sexo:'Femenino',telefono:'849-555-4321',ars:'Humano',direccion:'Bonao',alergias:'Sulfas, ibuprofeno',antPersonales:'Episodio depresivo previo (2023)',antFamiliares:'',medsActuales:'',seguimiento:true,email:''};
+  DB.pacientes.push(p1,p2,p3);
+  DB.consultas.push(
+    {id:uid(),pacienteId:p1.id,fecha:dISO(-95),tipo:'Primera vez',motivo:'Cefalea y cifras tensionales elevadas',examen:'TA 150/95, resto sin hallazgos',diagnostico:'Hipertensión arterial esencial',cie:'I10',plan:'Losartán 50 mg/día, dieta hiposódica, control en 1 mes',phq9:null,gad7:null},
+    {id:uid(),pacienteId:p1.id,fecha:dISO(-30),tipo:'Seguimiento',motivo:'Control de HTA',examen:'TA 130/85',diagnostico:'HTA controlada',cie:'I10',plan:'Continuar igual, control en 3 meses',phq9:null,gad7:null},
+    {id:uid(),pacienteId:p3.id,fecha:dISO(-10),tipo:'Primera vez',motivo:'Tristeza persistente, insomnio y anhedonia de 6 semanas',examen:'Examen mental: ánimo deprimido, sin ideación suicida activa',diagnostico:'Episodio depresivo moderado',cie:'F32.1',plan:'Sertralina 50 mg/día, psicoterapia semanal, retorno en 4 semanas',phq9:14,phq9vals:[2,2,2,2,1,2,1,1,1],gad7:9,gad7vals:[2,1,2,1,1,1,1]}
+  );
+  DB.citas.push(
+    {id:uid(),pacienteId:p2.id,fecha:hoyISO(),hora:'09:00',motivo:'Chequeo general',estado:'confirmada'},
+    {id:uid(),pacienteId:p3.id,fecha:hoyISO(),hora:'10:30',motivo:'Seguimiento — 4 semanas',estado:'programada'},
+    {id:uid(),pacienteId:p1.id,fecha:dISO(3),hora:'11:00',motivo:'Control HTA',estado:'programada'},
+    {id:uid(),pacienteId:p2.id,fecha:dISO(-7),hora:'09:00',motivo:'Chequeo',estado:'ausente'}
+  );
+  DB.recetas.push({id:uid(),pacienteId:p3.id,fecha:dISO(-10),items:[{med:'Sertralina 50 mg tabletas',dosis:'1 tableta cada 24 h en la mañana',dur:'por 30 días · #30'}],indicaciones:'Evitar alcohol. Puede causar náuseas los primeros días. Retornar en 4 semanas.'});
+  DB.facturas.push(
+    {id:uid(),num:'00001',pacienteId:p1.id,fecha:dISO(-95),concepto:'Consulta primera vez',monto:2500,estado:'pagada',ars:'SeNaSa',ncf:''},
+    {id:uid(),num:'00002',pacienteId:p1.id,fecha:dISO(-30),concepto:'Consulta seguimiento',monto:2000,estado:'pagada',ars:'SeNaSa',ncf:''},
+    {id:uid(),num:'00003',pacienteId:p3.id,fecha:dISO(-10),concepto:'Consulta primera vez',monto:3000,estado:'pendiente',ars:'Humano',ncf:''}
+  );
+  logAction('Datos de ejemplo cargados');saveDB();toast('Datos de ejemplo cargados');render();
+}
+
+/* ---------- Render principal ---------- */
+const VIEWS={dashboard:vDashboard,pacientes:vPacientes,'pacientes-detalle':vPacienteDetalle,
+  agenda:vAgenda,consultas:vConsultas,recetas:vRecetas,certificados:vCertificados,
+  facturacion:vFacturacion,reportes:vReportes,config:vConfig};
+function render(){
+  renderNav();
+  const v=VIEWS[route.view]||vDashboard;
+  $('#main').innerHTML=v();
+  window.scrollTo(0,0);
+}
+(async function init(){
+  if(SUPABASE_URL.includes('TU-PROYECTO')){
+    document.querySelector('.auth-card').innerHTML='<h1>Med<span>Consulta</span></h1>'+
+      '<div class="sub">Falta configurar la conexión</div>'+
+      '<div class="auth-msg err" style="display:block">Abre este archivo con un editor de texto y reemplaza SUPABASE_URL y SUPABASE_ANON_KEY con los datos de tu proyecto (líneas al inicio del script). Están en Supabase → Settings → API.</div>';
+    return;
+  }
+  SB=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  const {data:{session}}=await SB.auth.getSession();
+  if(session)await entrar();
+})();
+</script>
+</body>
+</html>
